@@ -18,7 +18,7 @@ import java.util.List;
 //
 // SAMPLE AUTO. It is not a match auto and its waypoints are not real field positions. It is the reference route
 // for this robot: the one place that shows every action AutoRunner has and how a route is written, for the team
-// and for AutoTool / PedroAI to learn the code style from. Real match autos are separate classes (AutoTool
+// and for AutoTool to learn the code style from. Real match autos are separate classes (AutoTool
 // writes them, like Blue_Near_9) and never edit this file.
 //
 // KEEP IT CURRENT. After every CAD, wiring or tuning step that changes what an auto can do (docs/BIOBUZZ_PLAN.md

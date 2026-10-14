@@ -28,9 +28,9 @@ if [ -f "$HERE/autotool/src/server/main.ts" ]; then
 else
   ROBOT_REPO="$HERE"
   TOOL="${AUTOTOOL_HOME:-$HERE/tools/autotool}"
-  # no submodule: a tool repo checked out next to the robot repo (../BIOBUZZ-AutoTool, ../PedroAI or ../biobuzz-autotool)
+  # no submodule: a tool repo checked out next to the robot repo (../BIOBUZZ-AutoTool or ../biobuzz-autotool)
   if [ -z "${AUTOTOOL_HOME:-}" ] && [ ! -f "$TOOL/autotool/src/server/main.ts" ]; then
-    for d in "$HERE/../BIOBUZZ-AutoTool" "$HERE/../PedroAI" "$HERE/../biobuzz-autotool"; do
+    for d in "$HERE/../BIOBUZZ-AutoTool" "$HERE/../biobuzz-autotool"; do
       [ -f "$d/autotool/src/server/main.ts" ] && { TOOL="$(cd "$d" && pwd)"; break; }
     done
   fi
