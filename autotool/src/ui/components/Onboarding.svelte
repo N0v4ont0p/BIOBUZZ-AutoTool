@@ -126,7 +126,7 @@
       <div class="nav"><button onclick={() => (step = 2)}>{app.server!.ai.enabled ? "Next" : "Skip: AI off for now"}</button></div>
     {:else if step === 2}
       <h2>2. Robot repo</h2>
-      <p>The folder with TeamCode and AutoRunner.java. AutoTool reads the whole repo and writes only in the autos folder: <code>AutoPaths.java</code>, and for each new auto its own <code>AutoAutoTool reads the whole repo and writes only <code>opmodes/AutoPaths.java</code>.lt;NameAutoTool reads the whole repo and writes only <code>opmodes/AutoPaths.java</code>.gt;Paths/Blue/Red.java</code> (plus a one-time, confirmed hook in <code>AutoRunner.java</code>).</p>
+      <p>The folder with TeamCode and AutoRunner.java. AutoTool reads the whole repo and writes only in the autos folder: one <code>&lt;Name&gt;.java</code> per auto, holding its Blue and Red OpModes (plus a one-time, confirmed hook in <code>AutoRunner.java</code>).</p>
       <input class="wide" bind:value={repoPath} aria-label="robot repo path" />
       <button class="primary" onclick={useRepo} disabled={busy || !repoPath.trim()}>Use this repo</button>
       {#if repoMsg}<p class="err">{repoMsg}</p>{/if}

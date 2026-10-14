@@ -19,7 +19,7 @@ import type { AgentEvent } from "./agent.ts";
 import type { Ledger } from "./ledger.ts";
 import { MODEL } from "./ledger.ts";
 import type { BuiltPrompt } from "./prompt.ts";
-import { type ToolContext, featuresText, runTool } from "./tools.ts";
+import { type ToolContext, errorSummary, featuresText, runTool } from "./tools.ts";
 
 const N = (d = "") => ({ type: "number", ...(d ? { description: d } : {}) });
 
@@ -213,7 +213,7 @@ export async function claudeCliTurn(prompt: BuiltPrompt, ctx: ToolContext, opts:
       return "failed";
     }
     const out = await runTool("submit_patch", r.output as Record<string, unknown>, ctx);
-    emit({ type: "tool", name: "submit_patch", summary: out.isError ? `error: ${out.content.split("\n")[0]}` : "received" });
+    emit({ type: "tool", name: "submit_patch", summary: out.isError ? `error: ${errorSummary(out.content)}` : "received" });
     if (out.claims) emit({ type: "claims", tool: "submit_patch", ok: out.claims.ok, mismatches: out.claims.mismatches.length, unverified: out.claims.unverifiedNumbers.length });
     if (out.submitted) {
       emit({ type: "result", patch: out.submitted.patch as Patch, spec: out.submitted.spec, claims: out.submitted.claims, repairs: attempt });

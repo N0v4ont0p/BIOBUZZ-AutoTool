@@ -178,6 +178,13 @@ function evaluatePatch(ctx: ToolContext, raw: unknown): { ok: boolean; text: str
   return { ok, text: out.join("\n"), patch, spec: applyPatch(ctx.spec, patch, "ai").spec, claims, delivered };
 }
 
+// a tool error's first line is often a heading ("Ops that failed:"); show it with its first item
+export function errorSummary(content: string): string {
+  const lines = content.split("\n");
+  const item = lines.find((l) => l.startsWith("- "));
+  return (lines[0].endsWith(":") && item ? `${lines[0]} ${item.slice(2)}` : lines[0]).slice(0, 200);
+}
+
 export async function runTool(name: string, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutcome> {
   try {
     switch (name) {

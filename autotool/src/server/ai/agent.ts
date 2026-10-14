@@ -15,7 +15,7 @@ import type { AutoSpec } from "../../shared/spec.ts";
 import type { ClaimResult } from "../../shared/patch.ts";
 import { type Ledger, MODEL } from "./ledger.ts";
 import type { BuiltPrompt } from "./prompt.ts";
-import { TOOL_DEFS, type ToolContext, runTool } from "./tools.ts";
+import { TOOL_DEFS, type ToolContext, errorSummary, runTool } from "./tools.ts";
 
 export type AgentEvent =
   | { type: "status"; text: string }
@@ -188,7 +188,7 @@ export class Agent {
       let submitId: string | null = null;
       for (const u of uses) {
         const out = await runTool(u.name, (u.input ?? {}) as Record<string, unknown>, ctx);
-        emit({ type: "tool", name: u.name, summary: out.isError ? `error: ${out.content.split("\n")[0]}` : out.content.split("\n")[0].slice(0, 140) });
+        emit({ type: "tool", name: u.name, summary: out.isError ? `error: ${errorSummary(out.content)}` : out.content.split("\n")[0].slice(0, 140) });
         if (out.claims) emit({ type: "claims", tool: u.name, ok: out.claims.ok, mismatches: out.claims.mismatches.length, unverified: out.claims.unverifiedNumbers.length });
         if (u.name === "submit_patch") {
           if (out.submitted && !submitted) {

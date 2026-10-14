@@ -219,3 +219,9 @@ test("claims: unit-bearing numbers in text must be backed", () => {
   assert.equal(bad.ok, false);
   assert.deepEqual(bad.unverifiedNumbers, ["3"]);
 });
+
+test("a tool error summary shows the heading with its first item", async () => {
+  const { errorSummary } = await import("../src/server/ai/tools.ts");
+  assert.equal(errorSummary("Ops that failed:\n- move_pose p9: no such pose\n- other"), "Ops that failed: move_pose p9: no such pose");
+  assert.equal(errorSummary("The patch does not match the schema"), "The patch does not match the schema");
+});
