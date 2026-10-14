@@ -1,7 +1,9 @@
 # BIOBUZZ AutoTool
 
+**Made by FTC Team 19859.**
+
 Draw or drag an autonomous route, see exactly what the robot will do and when, change it by typing a
-request, and get compile-checked `AutoRunner` code in the robot repo. Made by FTC team 19859, on top of
+request, and get compile-checked `AutoRunner` code in the robot repo. Built on top of
 a fork of [Pedro-Pathing/visualizer](https://github.com/Pedro-Pathing/visualizer) (Apache-2.0; see
 `NOTICE`). The plan it implements is [`PLAN.md`](PLAN.md); what was built and measured is at its end.
 
@@ -143,3 +145,7 @@ npm run eval:regress
 - `autotool/eval`: code-labelled evaluation cases, runner, prompt-example picker, regression gate.
   `node eval/run.ts --model ai --split validation --budget 0.5` runs Claude on the validation split.
 - `AUTOTOOL_FAKE_MODEL=1` (testing only) answers AI requests with the code rubric: no API calls.
+
+## Credit
+
+Made by FTC Team 19859. If you use or build on it, please credit **FTC Team 19859**.
