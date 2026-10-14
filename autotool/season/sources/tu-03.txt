@@ -1,0 +1,36 @@
+Team Update 03
+
+General
+
+Outreach Terms and Definitions
+The FIRST Tech Challenge Outreach Terms and Definitions have been updated for this season.
+
+Competition Manual
+
+Section 6 Awards (A)
+Links to the Judge Manual and the Judge Advisor Manual have been updated.
+
+10.3 Setup
+10.3.4 ROBOTS
+ROBOTS must start the MATCH contacting 4 pre-loaded POLLEN. POLLEN may be held in or on a
+ROBOT or placed on the TILES fully contained on its own ALLIANCE side of the FIELD contacting the
+ROBOT in its starting location.
+
+11.3 Pre-MATCH
+G304 *ROBOTS must be set up correctly on the FIELD. A ROBOT must be positioned on the FIELD
+     such that it meets all of the following requirements:
+          A. …
+          B. …
+          C. …
+          D. …
+          E. …
+          F. …
+          G. in contact with exactly 4 POLLEN pre-loads as described in Section 10.3.1 SCORING
+             ELEMENTS fully contained on its own ALLIANCE side of the FIELD, and
+          H. ...
+
+
+
+
+ Team Update 03                           October 1, 2026                                    1 of 1
+

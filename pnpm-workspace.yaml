@@ -1,0 +1,6 @@
+minimumReleaseAgeExclude:
+  - hotkeys-js@4.0.7
+
+allowBuilds:
+  esbuild: true
+  workerd: true

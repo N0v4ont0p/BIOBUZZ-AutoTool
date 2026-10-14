@@ -1,0 +1,201 @@
+Team Update 02
+
+General
+N/A
+
+Competition Manual
+
+10.6 Violations
+10.6.4   Violation Details
+                                      Table 10-6: Violation examples
+
+
+      Example Violation       Expanded Interpretation
+
+                              Upon instance of violation, a MINOR FOUL is assessed against the
+      MINOR FOUL
+                              violating ALLIANCE.
+
+      MAJOR FOUL and
+                              Upon violation, a MAJOR FOUL is assessed against the violating
+      YELLOW CARD per
+                              ALLIANCE. After the MATCH, the team is issued a YELLOW CARD.
+      instance.
+
+                              Upon instance of violation, a MINOR FOUL is assessed against the
+      MINOR FOUL per
+                              violating ALLIANCE equal to the number of SCORING ELEMENTS
+      SCORING ELEMENT.
+                              used in violation of the rule.
+
+                              Upon initial violation in a MATCH, a MAJOR FOUL is assessed
+                              against the violating ALLIANCE per instance of a violation
+                              occurring.
+                              If the condition of REPEATED in the second statement is met – i.e.,
+                              the ROBOT repeats the infraction an additional time in the MATCH,
+      MAJOR FOUL per          then an additional MAJOR FOUL is assessed against the violating
+      instance. MAJOR         ALLIANCE for the subsequent instance of violation and after the
+      FOUL per instance and   MATCH, the violating team is issued a YELLOW CARD for the
+      YELLOW CARD per         subsequent instance of violation.
+      MATCH if REPEATED.
+                              Assuming no additional infractions of that rule by that ROBOT in
+                              that MATCH, the ROBOT is assessed two MAJOR FOULS and a
+                              YELLOW CARD for their team in that MATCH ALLIANCE. Additional
+                              violations of this rule during the MATCH would increase the
+                              number of MAJOR FOULS assessed during the MATCH but not the
+                              number of YELLOW CARDS issued for the MATCH.
+
+
+
+
+ Team Update 02                         September 24, 2026                                      1 of 4
+   Example Violation         Expanded Interpretation
+                             Upon violation, a MAJOR FOUL is assessed against the violating
+   MAJOR FOUL and an
+                             ALLIANCE and the REFEREE begins to count. Their count continues
+   additional MAJOR
+                             until the criteria to discontinue the count are met, and for each 3
+   FOUL for every 3
+                             seconds within that time, an additional MAJOR FOUL is assessed
+   seconds in which the
+                             against the violating ALLIANCE. A ROBOT in violation of this type of
+   situation is not
+                             rule for 15 seconds is assessed a total of 6 MAJOR FOULS
+   corrected
+                             (assuming no other rules were being simultaneously violated).
+
+                             Upon a general instance of violation of the rule, a VERBAL
+   VERBAL WARNING.
+                             WARNING is issued to the violating team. However, if the violation
+   MAJOR FOUL and
+                             is perceived to be STRATEGIC by the REFEREES, then a MAJOR
+   YELLOW CARD per
+                             FOUL per MATCH is assessed against the violating ALLIANCE team
+   MATCH, if
+                             and after the MATCH, the violating team is issued a YELLOW CARD
+   STRATEGIC.
+                             for the MATCH.
+
+                             Upon the first violation, a MAJOR FOUL is assessed against the
+                             violating team. If the condition “if REPEATED” (e.g., a subsequent
+   MAJOR FOUL per
+                             violation by the same team in the same MATCH) is met, then the
+   instance of violation.
+                             violating team is issued another MAJOR FOUL. If these are the only
+   MAJOR FOUL and
+                             violations during the MATCH: after the MATCH, the violating team
+   YELLOW CARD if
+                             is assessed a YELLOW CARD for the second violation of this rule. In
+   REPEATED.
+                             total, 2 MAJOR FOULS and a YELLOW CARD were assessed during
+                             the MATCH.
+
+                             If one or more violations occurs by a team during MATCH, a
+                             MAJOR FOUL is assessed against the violating ALLIANCE per
+                             MATCH.
+   MAJOR FOUL per
+   MATCH. MAJOR FOUL         However, if the violation is perceived to be STRATEGIC by the
+   and YELLOW CARD per       REFEREES, a MAJOR FOUL is assessed per team per MATCH
+   MATCH, if                 against the violating ALLIANCE. After the MATCH, the team is
+   STRATEGIC.                issued a YELLOW CARD per MATCH.
+                             Only 1 MAJOR FOUL and up to 1 YELLOW CARD can be earned by a
+                             team in a single MATCH.
+
+                             Upon the first instance of violation, a VERBAL WARNING is issued
+   VERBAL WARNING.           to the violating team. If an additional instance of violation of the
+   YELLOW CARD if            same rule occurs later in the event, that is: a MATCH during the
+   subsequent violations     same event phase or a later event phase, then following any
+   occur during the event.   subsequent violation: after the MATCH, the violating team is issued
+                             a YELLOW CARD per instance.
+
+
+
+
+Team Update 02                         September 24, 2026                                      2 of 4
+    Example Violation         Expanded Interpretation
+
+                              Upon a general instance of violation of this rule, a VERBAL
+                              WARNING is issued to the violating team. However, if the violation
+                              is perceived to be STRATEGIC by the REFEREES, then a MAJOR
+    VERBAL WARNING.
+                              FOUL is assessed per instance against the violating ALLIANCE and
+    MAJOR FOUL and
+                              after the MATCH, the team is issued a YELLOW CARD per instance.
+    YELLOW CARD per
+    instance, if              However, if the violation is perceived to be STRATEGIC by the
+    STRATEGIC. MAJOR          REFEREES and the opponent ROBOT is unable to drive or the
+    FOUL and RED CARD         entanglement persists for 10 seconds or more, then upon violation,
+    per instance, if          a MAJOR FOUL is assessed per instance against the violating
+    STRATEGIC and either      ALLIANCE. After the MATCH, the team is issued a RED CARD per
+    CONTINUOUS                instance.
+    opponent ROBOT is
+                              Only 1 MAJOR FOUL and 1 YELLOW or RED CARD can be earned
+    unable to drive.
+                              for a single violation instance; however, multiple MAJOR FOULS
+                              and YELLOW or RED CARDS may be earned in a single MATCH if
+                              multiple instances of the violation occurred during the MATCH.
+
+11.4 In-MATCH
+
+11.4.5 Opponent Interaction
+G420 *Do not tip or entangle.
+
+             The attachment to, or entanglement with, exposed or unprotected
+             COMPONENTS or MECHANISMS in the course of normal gameplay is not
+             likely to be considered a violation of this rule. This includes, but is not
+             limited to:
+             A. exposed or unprotected wiring, or
+             B. a delicately constructed MECHANISM (such as an intake).
+             Examples of actions that are likely to be perceived as STRATEGIC include,
+             but are not limited to:
+             C. using a wedge-like MECHANISM to tip over an opponent ROBOT,
+             D. making frame-to-frame contact with an opponent ROBOT that is
+                 attempting to right itself after previously falling over and causing
+                 them to fall over, or
+             E. causing an opponent ROBOT to tip over by contacting the ROBOT
+                 after it starts to tip if, as determined by the REFEREE, that contact
+                 could have been avoided.
+             …
+
+
+
+
+ Team Update 02                         September 24, 2026                                     3 of 4
+11.4.6 Human
+G423 *DRIVE COACHES and other teams: hands off the controls.
+
+               The penalty is applied to the team to which the DRIVE TEAM member that
+               violates the rule belongs.
+               …
+
+G425 *DRIVE TEAMS, watch your reach.
+
+               …
+               For G425.A and G425.B, the penalty is applied to the team to which the
+               DRIVE TEAM member belongs regardless of whether the DRIVE TEAM
+               member or ROBOT initiates contact.
+               …
+
+G426 Humans may not enter NECTAR onto the FIELD early. DRIVE TEAM members may not
+     enter NECTAR onto the FIELD except:
+         A. for each time the HIVE of their corresponding ALLIANCE color is TIPPED, one additional
+            NECTAR may be entered for that ALLIANCE, or
+         B. when 60 seconds or less remain in the MATCH, all remaining NECTAR can be entered
+      whichever comes first.
+      Violation: MINOR FOUL per NECTAR.
+
+               The primary FIELD timer is the cue to indicate when there is 60 seconds
+               left in the MATCH.
+               NECTAR that leaves the FIELD may be re-entered at any time as described
+               in G427.
+               DRIVE TEAMS are encouraged to ensure the remaining NECTAR in their
+               ALLIANCE AREA is visible and make it obvious and unambiguous to
+               REFEREES that they are not entering NECTAR too early.
+               NECTAR does not have to be entered into the FIELD immediately when a
+               HIVE TIP occurs.
+
+
+
+
+Team Update 02                           September 24, 2026                                 4 of 4
+

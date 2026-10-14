@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/ui/**/*.ts", "src/ui/**/*.svelte", "src/shared/**/*.ts"]
+}

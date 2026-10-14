@@ -1,0 +1,8 @@
+dist
+out
+node_modules
+public
+pnpm-lock.yaml
+bun.lock
+package-lock.json
+*.min.js

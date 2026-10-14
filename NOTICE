@@ -1,0 +1,9 @@
+This repository has significant portions of a fork of this repository created by Matthew Allen, which is licensed under the Apache License 2.0.
+
+biobuzz-autotool is a fork of Pedro-Pathing/visualizer (https://github.com/Pedro-Pathing/visualizer),
+licensed under the Apache License 2.0 (see LICENSE). Changes made in this fork by FTC team 19859, 2026:
+- added autotool/ (the BIOBUZZ AutoTool: local server, route UI, AutoRunner code generator, evaluation)
+  and autotool.sh (its launcher); these files are new and are not part of the upstream visualizer
+- removed wrangler.jsonc (Cloudflare Workers) and .github/workflows/vercel-merge.yml (hosting):
+  this fork runs only on 127.0.0.1
+- the upstream visualizer under src/ and public/ is unchanged

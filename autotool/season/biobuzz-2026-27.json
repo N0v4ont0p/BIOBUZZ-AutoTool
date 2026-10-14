@@ -1,0 +1,118 @@
+{
+  "packVersion": 1,
+  "season": "biobuzz-2026-27",
+  "manual": {
+    "title": "BIOBUZZ Presented by RTX Competition Manual",
+    "version": "TU03",
+    "liveAsOf": "2026-10-08",
+    "lastModified": "2026-10-01",
+    "url": "https://ftc-resources.firstinspires.org/ftc/game/cm-html",
+    "teamUpdates": [
+      { "id": "TU00", "date": "2026-09-12", "affects": "none for autos (changes from last season)" },
+      { "id": "TU01", "date": "2026-09-17", "affects": "Fig 9-10: bottom of HIVE above TILES is 30.6 in (was 25.5): the space under the HIVE stays drivable", "sha256": "c17ba44c9159fbcde6355c9d9b05294e64bd0991cf627a54cbd89ab1d839bfce" },
+      { "id": "TU02", "date": "2026-09-24", "affects": "G426 adds 'whichever comes first' and 'NECTAR does not have to be entered immediately when a HIVE TIP occurs': human feed in AUTO stays none by default", "sha256": "6a8d61019238b51989e8b18621aec929df8ee94d3eb06a317a5bee20b87c84db" },
+      { "id": "TU03", "date": "2026-10-01", "affects": "10.3.4 / G304.G: the 4 pre-loaded POLLEN may be held in or on the ROBOT or placed on the TILES on its own ALLIANCE side contacting the ROBOT", "sha256": "2060af9f84eea6037d7a3be0bdd788719793360dd49d29f143a18e16f2de1d0c" }
+    ],
+    "checkedNoTu04": "tu-04 returned HTTP 404 on 2026-10-08"
+  },
+  "frame": {
+    "name": "pedro3_field",
+    "sizeIn": 144,
+    "tileIn": 24,
+    "origin": "corner of the red ALLIANCE wall and the audience wall (red GARDEN corner)",
+    "x": "toward the blue ALLIANCE wall",
+    "y": "toward the far (rear) wall",
+    "heading": "0 deg = +x, counter-clockwise positive",
+    "drawnFor": "BLUE",
+    "redIs": "the 180-degree rotation about (72, 72): (x, y, h) -> (144 - x, 144 - y, h + 180); never a mirror",
+    "sources": ["manual 9.1: approximately 144 in by 144 in inside the walls, 36 TILES of about 24 in", "TeamCode config/Field.java SIZE 144, CENTER 72", "TeamCode config/MatchState.java poseFactory: mirrorAroundPoint(72, 72)"],
+    "visualizerNote": "the stock Pedro-Pathing visualizer maps its field image to 141.5 in (config/defaults.ts FIELD_SIZE); the BIOBUZZ image is 6 x 6 tiles = 144 in, so AutoTool draws it at 144"
+  },
+  "fieldImage": { "file": "biobuzz.webp", "spansIn": 144, "source": "Pedro-Pathing/visualizer public/fields/biobuzz.webp, 1080 px = 6 tiles (7.5 px/in)" },
+  "elements": {
+    "POLLEN": { "diameterIn": 2.8, "source": "manual 9.8 (AndyMark am-5851)" },
+    "NECTAR": { "diameterIn": 3.6, "source": "manual 9.8 (AndyMark am-5852)" }
+  },
+  "allianceSide": {
+    "BLUE": { "x0": 72, "y0": 0, "x1": 144, "y1": 144 },
+    "RED": { "x0": 0, "y0": 0, "x1": 72, "y1": 144 },
+    "source": "G304.A / G402: FIELD columns A-C red, D-F blue; during AUTO navigating into the opposing side may be seen as STRATEGIC"
+  },
+  "loadingZone": {
+    "BLUE": { "x0": 133, "y0": 24, "x1": 144, "y1": 48 },
+    "RED": { "x0": 0, "y0": 96, "x1": 11, "y1": 120 },
+    "source": "manual 9.3, Fig 9-2/9-3 (read off the drawing, +-0.5 in on the tape edge; DSIM biobuzz config BB_LZ)"
+  },
+  "garden": {
+    "BLUE": { "x0": 121, "y0": 142, "x1": 144, "y1": 144 },
+    "RED": { "x0": 0, "y0": 0, "x1": 23, "y1": 2 },
+    "source": "manual 9.3 / 10.5.3, Fig 9-2/9-3 (strip depth off the drawing; DSIM BB_GARDEN)"
+  },
+  "cells": {
+    "BLUE": { "far": { "x": 84.75, "y": 85.37 }, "audience": { "x": 84.75, "y": 58.63 } },
+    "RED": { "far": { "x": 59.25, "y": 85.37 }, "audience": { "x": 59.25, "y": 58.63 } },
+    "upAtStart": { "BLUE": "far", "RED": "audience" },
+    "openingIn": { "w": 20, "zBottom": 53.5, "zTop": 65.6 },
+    "targetRule": "own CELL on the robot's side of y = 72 (TeamCode config/Field.targetCell)",
+    "source": "HIVE pivots 25.5 in apart about the field centre (Fig 9-10), CELL centre 13.37 in from its pivot in plan (owner CAD 2026-09-12, DSIM BB_HIVE_CELL_DY); used only until the team enters H-1 (Tuned.redFarCellX ...)"
+  },
+  "flowers": [
+    { "id": "F1", "wall": "left", "x": 2.54, "y": 48, "nearest": "RED", "foot": { "x0": 0, "y0": 45, "x1": 4.9, "y1": 51 } },
+    { "id": "F2", "wall": "rear", "x": 48, "y": 141.46, "nearest": "RED", "foot": { "x0": 45, "y0": 139.1, "x1": 51, "y1": 144 } },
+    { "id": "F3", "wall": "right", "x": 141.46, "y": 96, "nearest": "BLUE", "foot": { "x0": 139.1, "y0": 93, "x1": 144, "y1": 99 } },
+    { "id": "F4", "wall": "audience", "x": 96, "y": 2.54, "nearest": "BLUE", "foot": { "x0": 93, "y0": 0, "x1": 99, "y1": 4.9 } }
+  ],
+  "flowerSource": "manual 9.7, Fig 9-12; ring centre 2.54 in off the wall on the tile seam one tile off centre, foot 6 x 4.9 in (owner CAD 2026-09-12, DSIM BB_FLOWERS / BB_FLOWER_FOOT)",
+  "obstacles": [
+    { "id": "hiveFrameRed", "name": "HIVE frame base (red side)", "rect": { "x0": 47, "y0": 52.6, "x1": 48, "y1": 91.4 }, "source": "manual 9.6 Fig 9-8 frame 38.95 in deep; bar inner edge on the 24 in tile seam (owner CAD, DSIM BB_FRAME_BAR_IN/OUT, BB_FRAME_Y)" },
+    { "id": "hiveFrameBlue", "name": "HIVE frame base (blue side)", "rect": { "x0": 96, "y0": 52.6, "x1": 97, "y1": 91.4 }, "source": "as hiveFrameRed, rotated" },
+    { "id": "F1foot", "name": "FLOWER F1", "rect": { "x0": 0, "y0": 45, "x1": 4.9, "y1": 51 }, "source": "flowers[F1].foot" },
+    { "id": "F2foot", "name": "FLOWER F2", "rect": { "x0": 45, "y0": 139.1, "x1": 51, "y1": 144 }, "source": "flowers[F2].foot" },
+    { "id": "F3foot", "name": "FLOWER F3", "rect": { "x0": 139.1, "y0": 93, "x1": 144, "y1": 99 }, "source": "flowers[F3].foot" },
+    { "id": "F4foot", "name": "FLOWER F4", "rect": { "x0": 93, "y0": 0, "x1": 99, "y1": 4.9 }, "source": "flowers[F4].foot" }
+  ],
+  "staged": [
+    { "id": "gB1", "type": "POLLEN", "x": 142.6, "y": 142.6, "where": "blue GARDEN", "access": "floor" },
+    { "id": "gB2", "type": "POLLEN", "x": 139.8, "y": 142.6, "where": "blue GARDEN", "access": "floor" },
+    { "id": "gB3", "type": "POLLEN", "x": 137.0, "y": 142.6, "where": "blue GARDEN", "access": "floor" },
+    { "id": "gB4", "type": "POLLEN", "x": 134.2, "y": 142.6, "where": "blue GARDEN", "access": "floor" },
+    { "id": "gR1", "type": "POLLEN", "x": 1.4, "y": 1.4, "where": "red GARDEN", "access": "floor" },
+    { "id": "gR2", "type": "POLLEN", "x": 4.2, "y": 1.4, "where": "red GARDEN", "access": "floor" },
+    { "id": "gR3", "type": "POLLEN", "x": 7.0, "y": 1.4, "where": "red GARDEN", "access": "floor" },
+    { "id": "gR4", "type": "POLLEN", "x": 9.8, "y": 1.4, "where": "red GARDEN", "access": "floor" },
+    { "id": "F1s", "type": "POLLEN", "x": 2.54, "y": 48, "count": 4, "where": "FLOWER F1 stack", "access": "flowerBottom" },
+    { "id": "F2s", "type": "POLLEN", "x": 48, "y": 141.46, "count": 4, "where": "FLOWER F2 stack", "access": "flowerBottom" },
+    { "id": "F3s", "type": "POLLEN", "x": 141.46, "y": 96, "count": 4, "where": "FLOWER F3 stack", "access": "flowerBottom" },
+    { "id": "F4s", "type": "POLLEN", "x": 96, "y": 2.54, "count": 4, "where": "FLOWER F4 stack", "access": "flowerBottom" }
+  ],
+  "stagedSource": "manual 10.3.1 / Fig 10-2: 4 POLLEN in each FLOWER, 4 in each GARDEN in a line from the corner nearest the ALLIANCE AREA touching the wall, 4 pre-loaded per ROBOT; 3 NECTAR in each up-CELL and 5 in each ALLIANCE AREA (not on the field). Garden positions: one POLLEN radius off both walls, one diameter apart (DSIM spawn.ts gardenLine)",
+  "rules": {
+    "autoDurationS": 30,
+    "maxControlled": { "value": 4, "rule": "G407" },
+    "preload": { "POLLEN": 4, "rule": "10.3.4 / G304.G (TU03)" },
+    "start": {
+      "rule": "G304",
+      "clauses": {
+        "A": "fully on its own ALLIANCE side, inside the perimeter, no overhang",
+        "C": "touching the FIELD perimeter wall",
+        "D": "not contacting or in the scoring volume of a FLOWER",
+        "E": "not in the LOADING ZONE",
+        "G": "in contact with exactly 4 POLLEN pre-loads"
+      },
+      "wallTouchTolIn": 0.5
+    },
+    "autoSide": { "rule": "G402", "text": "No AUTO opponent interference; navigating into the opposing side during AUTO is risky and may be STRATEGIC" },
+    "flower": { "rule": "G418", "text": "POLLEN may only be removed from the bottom of a FLOWER; NECTAR never" },
+    "nectarFlower": { "rule": "G410", "text": "NECTAR into FLOWERS only in the last 60 s: never in AUTO" },
+    "humanFeed": { "rule": "G426 / G427 (TU02)", "default": "none", "text": "NECTAR may be entered once per own HIVE TIP or with 60 s or less left; in a 30 s AUTO only after a TIP. AutoTool never counts on it" },
+    "startConfig": { "rule": "R102", "cubeIn": 18 },
+    "expanded": { "rule": "R105", "maxFootprintIn": [18, 24] }
+  },
+  "scoring": {
+    "LEAVE": { "auto": 3, "text": "no longer contacting the perimeter wall at the end of AUTO", "source": "10.5.4 / Table 10-2" },
+    "PARK": { "auto": 5, "teleop": 5, "text": "at least partially in the LOADING ZONE", "source": "10.5.4 / Table 10-2" },
+    "HIVE_TIP": { "auto": 20, "teleop": 20, "source": "Table 10-2" },
+    "CELL_REMAINING": { "auto": null, "endOfMatch": 2, "text": "POLLEN and/or NECTAR left in an upward-facing CELL at the end of the MATCH (no AUTO points)", "source": "10.5.1 / Table 10-2" },
+    "tipPollenByNectar": { "table": [8, 7, 6, 3, 1, 0], "text": "index = NECTAR in the up-CELL, value = POLLEN that tips it; staged up-CELL holds 3 NECTAR, so 3 POLLEN tip it", "source": "Event Field Setup Guide V1.0 section 12 (DSIM BB_TIP_POLLEN)" }
+  }
+}

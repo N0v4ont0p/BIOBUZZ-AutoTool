@@ -1,0 +1,32 @@
+{
+  "name": "biobuzz-autotool",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "BIOBUZZ AutoTool: draw, annotate and generate AutoRunner autos (fork of Pedro-Pathing/visualizer)",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "check": "tsc -p tsconfig.json && svelte-check --tsconfig ./tsconfig.ui.json --threshold warning",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "start": "node src/server/main.ts",
+    "eval": "node eval/run.ts",
+    "eval:generate": "node eval/generate.ts && node eval/examples.ts",
+    "eval:regress": "node eval/regress.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.128.0",
+    "@sveltejs/vite-plugin-svelte": "7.3.0",
+    "svelte": "5.56.10",
+    "typescript": "6.0.3",
+    "vite": "8.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.7",
+    "svelte-check": "4.7.6"
+  }
+}
