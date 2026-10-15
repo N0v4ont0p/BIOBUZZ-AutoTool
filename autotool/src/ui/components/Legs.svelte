@@ -62,14 +62,18 @@
   function rampLine(leg: Leg, lf: AutoFeatures["legs"][number]): { text: string; bad: boolean; needWaitS: number | null } | null {
     const r = lf.ramp;
     const pct = (v: number) => `${Math.round(v * 100)}%`;
-    if (leg.during !== "RAMP") return r.maxOut > 0.02 ? { text: `folding in: ${pct(r.atStart)} out when this leg starts`, bad: false, needWaitS: null } : null;
+    if (leg.during !== "RAMP") {
+      if (r.maxOut <= 0.02) return null;
+      const fold = features.ramp.moves.find((m) => m.legId === leg.id && !m.out);
+      return { text: fold ? `${pct(r.atStart)} out when this leg starts; folds at ${fold.t.toFixed(2)} s (${(fold.t - lf.startS).toFixed(2)} s into the leg: ${fold.why})` : `${pct(r.atStart)} out when this leg starts`, bad: false, needWaitS: null };
+    }
     const swing = features.ramp.travelS;
     const head = `comes out at the leg start (${swing} s swing): ${pct(r.atArrival)} out on arrival`;
     if (r.late.length || r.outAtS === null) {
       const need = Math.ceil((1 - r.atArrival) * swing * 10) / 10;
       const canWait = leg.end === "NONE" || leg.end === "WAIT";
       return {
-        text: `${head}, ${r.outAtS === null ? "never fully out on this leg" : `fully out at ${r.outAtS} s`}${r.late.length ? `; reaches ${r.late.join(", ")} before it is out` : ""}${canWait ? "" : " (the shot folds it in on arrival)"}`,
+        text: `${head}, ${r.outAtS === null ? "never fully out on this leg" : `fully out at ${r.outAtS} s`}${r.late.length ? `; reaches ${r.late.join(", ")} before it is out` : ""}${canWait ? "" : " (the intake is off during the shot: end it with a WAIT instead)"}`,
         bad: true,
         needWaitS: canWait && need > (leg.end === "WAIT" ? (leg.waitS ?? 0) : 0) ? need : null,
       };
@@ -308,6 +312,9 @@
                 </span>
               </div>
             {/if}
+          {/if}
+          {#if leg.during === "RAMP"}
+            <div class="f"><span class="k">Ramp carry</span><span><input type="number" step="0.1" min="0" max="3" placeholder={String(model.rampCarryS)} value={leg.carryRampS ?? ""} onchange={(e) => edit((s) => setOption(s, leg.id, "carryRampS", num(e.currentTarget.value)))} aria-label="ramp carry (s)" /> s <span class="muted">the ramp stays out this long into the next leg, so the robot backs out of the FLOWER before it folds</span></span></div>
           {/if}
           {#if leg.end === "WAIT"}
             <div class="f"><span class="k">Wait</span><span><input type="number" step="0.1" min="0.1" max="30" value={leg.waitS ?? ""} onchange={(e) => edit((s) => setOption(s, leg.id, "waitS", num(e.currentTarget.value)))} aria-label="wait (s)" /> s</span></div>

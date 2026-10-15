@@ -7,8 +7,9 @@
 //    and feeds FEED_S; if the CELL is outside the yaw travel it gives up after the shot timeout (SHOT_TIMEOUT_S) and
 //    skips the shot (nothing is fired);
 //  - PARK holds and ends the auto; past ABORT_AT_S no further leg runs.
-//  - the ramp (nextLeg / runLeg / finish): out at the start of a RAMP leg; in at the start of any other leg,
-//    when a SHOOT leg reaches its end, at PARK, when the last leg is done and at ABORT_AT_S. Only once
+//  - the ramp (nextLeg / runLeg / finish): out at the start of a RAMP leg; after a RAMP leg it folds the leg's
+//    carryRamp time (RAMP_CARRY_S) into the next leg, unless that leg is a RAMP leg too; a SHOOT on any other leg
+//    folds it at the path end; PARK, the last leg done and ABORT_AT_S fold it at once. Only once
 //    Tuned.rampStowed / rampDeployed are set (otherwise it never moves).
 
 import {
@@ -537,12 +538,21 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
   // already out, or stowRamp on one that is in, moves nothing)
   const rampMoves: RampMove[] = [];
   let rampCommanded = false;
+  // the fold after a RAMP leg, due carryRamp seconds into the next leg; a RAMP leg starting first cancels it
+  let rampFold: RampMove | null = null;
   const commandRamp = (at: number, out: boolean, why: string, legId: string | null) => {
     if (out === rampCommanded) return;
     rampCommanded = out;
     rampMoves.push({ t: at, out, why, legId }); // exact: a leg's own command must not land after its start
   };
-  const rampAt = (at: number) => rampOutAt(rampMoves, model.rampTravelS, at);
+  const foldDue = (upTo: number) => {
+    if (rampFold && rampFold.t <= upTo + 1e-9) {
+      commandRamp(rampFold.t, false, rampFold.why, rampFold.legId);
+      rampFold = null;
+    }
+  };
+  const movesNow = () => (rampFold ? [...rampMoves, rampFold] : rampMoves);
+  const rampAt = (at: number) => rampOutAt(movesNow(), model.rampTravelS, at);
 
   for (let i = 0; i < spec.legs.length; i++) {
     const leg = spec.legs[i];
@@ -554,8 +564,21 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
     const cut: LegFeatures["cut"] = aborted || startS >= model.abortAtS ? "never" : startS + travel > model.abortAtS ? "partial" : "none";
     if (cut !== "none") cutLegIds.push(leg.id);
     if (cut === "never") aborted = true;
-    // nextLeg(): a RAMP leg puts the ramp out, any other leg stows it
-    if (cut !== "never") commandRamp(startS, leg.during === "RAMP", leg.during === "RAMP" ? `${leg.id} is a RAMP leg` : `${leg.id} is not a RAMP leg`, leg.id);
+    // nextLeg(): a RAMP leg puts the ramp out (and cancels a fold still due); any other leg folds it, after the
+    // carryRamp time of the RAMP leg before it
+    if (cut !== "never") {
+      foldDue(startS);
+      if (leg.during === "RAMP") {
+        rampFold = null;
+        commandRamp(startS, true, `${leg.id} is a RAMP leg`, leg.id);
+      } else if (rampCommanded && !rampFold) {
+        const prev = i > 0 && spec.legs[i - 1].during === "RAMP" ? spec.legs[i - 1] : null;
+        const carry = prev ? (prev.carryRampS ?? model.rampCarryS) : 0;
+        const why = prev ? `${prev.id}'s ramp folds ${carry} s into ${leg.id}` : `${leg.id} is not a RAMP leg`;
+        if (carry > 0) rampFold = { t: startS + carry, out: false, why, legId: leg.id };
+        else commandRamp(startS, false, why, leg.id);
+      }
+    }
 
     const heldAtLegStart = held.length;
     const lf: LegFeatures = {
@@ -677,7 +700,7 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
       if (holdS > 0 && last && cut === "none") {
         const endPose = { x: last.x, y: last.y, headingDeg: last.headingDeg };
         const until = Math.min(arrive + holdS, model.abortAtS);
-        const outAt = rampReachesAt(rampMoves, model.rampTravelS, arrive, 1);
+        const outAt = rampReachesAt(movesNow(), model.rampTravelS, arrive, 1);
         if (outAt !== null && outAt > arrive && outAt <= until) pickAt(endPose, outAt, lf.intakeRuns || outAt <= carryUntil, false);
         rampTouches(endPose, rampAt(until));
       }
@@ -815,12 +838,17 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
     }
     lf.endActionS = endActionS;
     lf.endActionWorstS = endWorst;
-    // runLeg(): a SHOOT stows the ramp when the path is done, before it aims; PARK ends the auto (finish stows it)
+    // runLeg(): a SHOOT stows the ramp when the path is done, before it aims, except on a RAMP leg (its ramp is still
+    // in the FLOWER: it folds once the next leg has backed away); PARK ends the auto (finish stows it)
     const arriveS = startS + travel;
-    if ((leg.end === "SHOOT" || leg.end === "PARK") && arriveS < model.abortAtS && cut !== "never") commandRamp(arriveS, false, leg.end === "SHOOT" ? `${leg.id} stows it to shoot` : `${leg.id} parks: the auto ends`, leg.id);
+    if (arriveS < model.abortAtS && cut !== "never" && ((leg.end === "SHOOT" && leg.during !== "RAMP") || leg.end === "PARK")) {
+      foldDue(arriveS);
+      rampFold = null;
+      commandRamp(arriveS, false, leg.end === "SHOOT" ? `${leg.id} stows it to shoot` : `${leg.id} parks: the auto ends`, leg.id);
+    }
     {
       const legEnd = Math.min(arriveS + endActionS + (leg.end === "WAIT" ? (leg.waitS ?? 0) : 0), model.abortAtS);
-      const outAt = leg.during === "RAMP" && cut !== "never" ? rampReachesAt(rampMoves, model.rampTravelS, startS, 1) : null;
+      const outAt = leg.during === "RAMP" && cut !== "never" ? rampReachesAt(movesNow(), model.rampTravelS, startS, 1) : null;
       lf.ramp.outAtS = outAt !== null && outAt <= legEnd + 1e-9 ? round(outAt, 2) : null;
       if (lf.ramp.outAtS !== null) lf.ramp.maxOut = 1;
       lf.ramp.late = lf.ramp.late.filter((id) => !lf.picked.some((p) => p.id === id));
@@ -839,7 +867,7 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
             level: "warning",
             code: "ramp.neverOut",
             where: `leg:${leg.id}`,
-            message: `the ramp never gets fully out on ${leg.id} (at most ${pct(lf.ramp.maxOut)}): the leg lasts ${round(legEnd - startS, 2)} s${leg.end === "SHOOT" ? " before the shot stows it" : ""} and the ramp needs ${model.rampTravelS} s`,
+            message: `the ramp never gets fully out on ${leg.id} (at most ${pct(lf.ramp.maxOut)}): the leg lasts ${round(legEnd - startS, 2)} s and the ramp needs ${model.rampTravelS} s`,
           });
         }
       }
@@ -883,7 +911,9 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
     });
   }
 
-  // finish(): the last leg done, or ABORT_AT_S, stows the ramp
+  // finish(): the last leg done, or ABORT_AT_S, stows the ramp (a fold due before then has happened)
+  foldDue(Math.min(t, model.abortAtS));
+  rampFold = null;
   if (rampCommanded) commandRamp(Math.min(t, model.abortAtS), false, t >= model.abortAtS ? `the auto stops at ${model.abortAtS} s` : "the auto is done", null);
   const rampUsed = spec.legs.some((l) => l.during === "RAMP");
   const lim = pack.rules.expanded?.maxFootprintIn ?? null;

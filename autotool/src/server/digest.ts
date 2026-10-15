@@ -179,6 +179,7 @@ export function buildDigest(repo: RobotRepo, store: Store, progress?: (msg: stri
     const t = texts.get(runner.file) ?? "";
     if (/public Leg timeout\(double/.test(t)) legMethods.push("timeout(seconds)");
     if (/public Leg carryIntake\(double/.test(t)) legMethods.push("carryIntake(seconds)");
+    if (/public Leg carryRamp\(double/.test(t)) legMethods.push("carryRamp(seconds)");
     if (/public Leg\(Path path, Action action\)/.test(t)) legMethods.unshift("Leg(Path, Action)");
     if (/public Leg\(Pose target, Action action\)/.test(t)) legMethods.unshift("Leg(Pose target, Action)");
   }

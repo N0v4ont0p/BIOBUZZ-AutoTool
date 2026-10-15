@@ -344,12 +344,14 @@ test("one file per auto: Blue and Red OpModes, AutoTool writes only between the 
   const spec = { ...sampleSpec(), name: "close_9" };
   spec.legs[2] = { ...spec.legs[2], end: "SHOOT" }; // collect on the way, shoot at the end
   spec.legs[1] = { ...spec.legs[1], end: "WAIT", waitS: 1.5 };
+  spec.legs[3] = { ...spec.legs[3], during: "RAMP", carryRampS: 0.8 };
   const java = renderAutoFile(spec, n, "BIOBUZZ TeleOp");
   assert.match(java, /public class Near_9 \{/);
   assert.match(java, /@Autonomous\(name = "Blue_Near_9", group = "AutoTool", preselectTeleOp = "BIOBUZZ TeleOp"\)\n {4}public static class Blue extends AutoRunner/);
   assert.match(java, /@Autonomous\(name = "Red_Near_9"[^)]*\)\n {4}public static class Red extends Blue/);
   assert.ok(java.includes("new Leg(sweepGarden(), During.INTAKE, End.SHOOT).timeout(3.0).carryIntake(0.4)"), java);
   assert.ok(java.includes("new Leg(shot1ToGarden(), During.NONE, End.WAIT).waitFor(1.5)"), java);
+  assert.ok(java.includes("During.RAMP, End.SHOOT).carryRamp(0.8)"), java);
   // the leg is a direct copy both ways
   const back = importAutoTool(java, new Map());
   assert.ok(back.ok, JSON.stringify(!back.ok && back.errors));
@@ -398,7 +400,7 @@ test("reader: an AutoRunner route with helper methods, unset Tuned values, every
   public List<AutoRunner.Leg> legs() {
     return Arrays.asList(
         new AutoRunner.Leg(line(start, mid), AutoRunner.Action.SHOOT),
-        new AutoRunner.Leg(line(mid, park), AutoRunner.During.RAMP, AutoRunner.End.WAIT).timeout(4).carryIntake(0.5).waitFor(1),
+        new AutoRunner.Leg(line(mid, park), AutoRunner.During.RAMP, AutoRunner.End.WAIT).timeout(4).carryIntake(0.5).waitFor(1).carryRamp(0.7),
         new AutoRunner.Leg(park, AutoRunner.Action.PARK));
   }
 }`,
@@ -413,7 +415,7 @@ test("reader: an AutoRunner route with helper methods, unset Tuned values, every
   assert.deepEqual(r.unknowns.sort(), ["Tuned.ph", "Tuned.px", "Tuned.py", "Tuned.sh", "Tuned.sx", "Tuned.sy"]);
   const spec = readToSpec(r, "sample", "Route.java");
   assert.deepEqual(spec.legs.map(stopKey), ["NONE/SHOOT", "RAMP/WAIT", "NONE/PARK"]);
-  assert.deepEqual([spec.legs[1].waitS, spec.legs[1].carryIntakeS], [1, 0.5]);
+  assert.deepEqual([spec.legs[1].waitS, spec.legs[1].carryIntakeS, spec.legs[1].carryRampS], [1, 0.5, 0.7]);
   // unset start and park get a first guess, so everything draws at once; the rest follows from them
   assert.deepEqual(spec.reader!.guessed!.sort(), ["Tuned.ph", "Tuned.px", "Tuned.py", "Tuned.sh", "Tuned.sx", "Tuned.sy"]);
   assert.ok(spec.poses.every((p) => p.x !== null && p.y !== null && p.headingDeg !== null));
@@ -619,6 +621,22 @@ test("ramp: AutoRunner's commands at the servo's travel time; late, waited-for, 
   assert.equal(far.legs[0].picked.length, 4);
   assert.deepEqual(far.ramp.moves.map((m) => `${m.legId}:${m.out ? "out" : "in"}`), ["L1:out", "L2:in"]);
   assert.equal(far.ramp.moves[0].t, 0);
+  // it folds RAMP_CARRY_S into L2 (the robot backs out of the FLOWER first), not the moment L1 ends
+  assert.ok(Math.abs(far.ramp.moves[1].t - (far.legs[1].startS + 0.5)) < 1e-9, JSON.stringify(far.ramp.moves));
+  assert.equal(far.ramp.moves[1].why, "L1's ramp folds 0.5 s into L2");
+  assert.equal(far.legs[1].ramp.atStart, 1);
+  // carryRamp on the leg overrides the default; 0 folds it the moment the next leg starts
+  const carried = run(110, "NONE", null);
+  const longer = (() => {
+    const s = sampleSpec();
+    s.preload.POLLEN = 0;
+    Object.assign(s.poses.find((x) => x.name === "shot1")!, { x: 129, y: 96, headingDeg: 0 });
+    Object.assign(s.poses.find((x) => x.name === "start")!, { x: 110, y: 96, headingDeg: 0 });
+    s.legs[0] = { ...s.legs[0], during: "RAMP", end: "NONE", carryRampS: 1.2 };
+    return computeFeatures(s, pack, model);
+  })();
+  assert.ok(Math.abs(longer.ramp.moves[1].t - (longer.legs[1].startS + 1.2)) < 1e-9);
+  assert.ok(carried.ramp.moves[1].t < longer.ramp.moves[1].t);
   assert.equal(far.legs[0].ramp.outAtS, 0.55);
   assert.equal(far.legs[0].ramp.atArrival, 1);
   // a 2 in hop gets there in about 0.5 s: the ramp is not out yet, and L2 folds it back in
@@ -633,11 +651,19 @@ test("ramp: AutoRunner's commands at the servo's travel time; late, waited-for, 
   assert.equal(waited.legs[0].picked[0].atS, 0.55);
   assert.deepEqual(waited.legs[0].ramp.late, []);
   assert.ok(!waited.problems.some((p) => p.code.startsWith("ramp.late")));
-  // ...a SHOOT folds it in on arrival: never fully out
+  // ...a SHOOT ending a RAMP leg keeps it out through the shot (it folds once L2 has backed away)
   const shot = run(127, "SHOOT", null);
-  assert.equal(shot.legs[0].ramp.outAtS, null);
-  assert.ok(Math.abs(shot.ramp.moves[1].t - shot.legs[0].travelS) < 1e-9);
-  assert.equal(shot.ramp.moves[1].why, "L1 stows it to shoot");
+  assert.ok(shot.legs[0].ramp.outAtS !== null, JSON.stringify(shot.legs[0].ramp));
+  assert.ok(Math.abs(shot.ramp.moves[1].t - (shot.legs[1].startS + 0.5)) < 1e-9);
+  // a SHOOT on the next (not RAMP) leg folds it at its path end if the carry is still running
+  const s3 = sampleSpec();
+  s3.legs[0] = { ...s3.legs[0], during: "RAMP", end: "NONE", carryRampS: 3 };
+  s3.legs[1] = { ...s3.legs[1], end: "SHOOT" };
+  const shotNext = computeFeatures(s3, pack, model);
+  const next = shotNext.legs[1];
+  assert.ok(next.travelS < 3, String(next.travelS));
+  assert.ok(Math.abs(shotNext.ramp.moves[1].t - (next.startS + next.travelS)) < 1e-9, JSON.stringify(shotNext.ramp.moves));
+  assert.equal(shotNext.ramp.moves[1].why, "L2 stows it to shoot");
   // the robot never moves it until program 4 has put both positions in the code
   assert.ok(far.problems.some((p) => p.code === "ramp.positions"));
   assert.ok(!run(110, "NONE", null, { rampPositions: "set" }).problems.some((p) => p.code === "ramp.positions"));

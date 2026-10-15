@@ -49,6 +49,10 @@ export function factsFromDigest(d: Digest, pack: SeasonPack): Record<string, Fac
   set("shotAbandonS", fromConstant(d, `${AR}.SHOT_TIMEOUT_S`, "") ?? fromConstant(d, `${AR}.SHOT_ABANDON_S`, "")); // renamed when the Leg got its shot timeout
   set("stoppedSpeed", fromConstant(d, `${AR}.STOPPED_SPEED`, ""));
   set("stoppedTurnDeg", fromConstant(d, `${AR}.STOPPED_TURN_DEG`, ""));
+  // an AutoRunner without RAMP_CARRY_S folds the ramp the moment the next leg starts
+  const carry = d.constants[`${AR}.RAMP_CARRY_S`];
+  if (carry) set("rampCarryS", fromConstant(d, `${AR}.RAMP_CARRY_S`, ""));
+  else if (d.constants[`${AR}.ABORT_AT_S`]) set("rampCarryS", { value: 0, status: "code", source: `${d.constants[`${AR}.ABORT_AT_S`].file}: AutoRunner has no RAMP_CARRY_S, so it folds the ramp when the next leg starts` });
   for (const k of ["centerToFront", "centerToBack", "centerToLeft", "centerToRight"]) set(k, fromConstant(d, `Tuned.${k}`, "CAD sheet C-2"), `the start cube is ${pack.rules.startConfig.cubeIn} in (R102)`);
   for (const k of ["frontPivotX", "frontPivotY", "backPivotX", "backPivotY"]) set(k, fromConstant(d, `Tuned.${k}`, "CAD sheet C-3"), "aim from the robot centre");
   set("yawMinDeg", fromConstant(d, "Tuned.yawMinDeg", "Yaw Tuner G-1 part A"), "CAD sheet C-6 asks for stops past 90 deg");

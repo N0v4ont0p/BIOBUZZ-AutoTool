@@ -235,8 +235,8 @@ export function setStop(spec: AutoSpec, legId: string, during: During, end: End)
   return s;
 }
 
-// One leg option: timeout, carryIntake, shotTimeout or the WAIT time. null = AutoRunner's default.
-export function setOption(spec: AutoSpec, legId: string, key: "legTimeoutS" | "carryIntakeS" | "shotTimeoutS" | "waitS", v: number | null): AutoSpec {
+// One leg option: timeout, carryIntake, carryRamp, shotTimeout or the WAIT time. null = AutoRunner's default.
+export function setOption(spec: AutoSpec, legId: string, key: "legTimeoutS" | "carryIntakeS" | "shotTimeoutS" | "waitS" | "carryRampS", v: number | null): AutoSpec {
   const s = cloneSpec(spec);
   const l = s.legs.find((x) => x.id === legId);
   if (!l) return spec;
@@ -291,8 +291,8 @@ export function moveStop(spec: AutoSpec, from: number, to: number): AutoSpec {
       leg = { ...own, method, path: { type: "line", from: prev, to: stop }, heading: { mode: "linear", from: prev, to: stop } };
     }
     // the stop's own during/end and options travel with it
-    leg = { ...leg, junction: own.junction, during: own.during, end: own.end, carryIntakeS: own.carryIntakeS, legTimeoutS: own.legTimeoutS, shotTimeoutS: own.shotTimeoutS, waitS: own.waitS };
-    for (const k2 of ["shotTimeoutS", "waitS"] as const) if (leg[k2] === undefined) delete leg[k2];
+    leg = { ...leg, junction: own.junction, during: own.during, end: own.end, carryIntakeS: own.carryIntakeS, legTimeoutS: own.legTimeoutS, shotTimeoutS: own.shotTimeoutS, waitS: own.waitS, carryRampS: own.carryRampS };
+    for (const k2 of ["shotTimeoutS", "waitS", "carryRampS"] as const) if (leg[k2] === undefined) delete leg[k2];
     prev = stop;
     return leg;
   });

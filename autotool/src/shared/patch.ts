@@ -11,7 +11,7 @@ export type PatchOp =
   | { op: "add_leg"; after: string; pose: { name?: string; x: number; y: number; headingDeg: number }; during: During; end: End; waitS?: number }
   | { op: "delete_leg"; leg: string }
   | { op: "set_auto"; intakeAlways: boolean }
-  | { op: "set_leg"; leg: string; legTimeoutS?: number | null; carryIntakeS?: number; shotTimeoutS?: number | null; heading?: "linear" | "constant" | "tangent" | "reverseTangent" }
+  | { op: "set_leg"; leg: string; legTimeoutS?: number | null; carryIntakeS?: number; shotTimeoutS?: number | null; carryRampS?: number | null; heading?: "linear" | "constant" | "tangent" | "reverseTangent" }
   | { op: "set_preload"; POLLEN: number; onTiles: number };
 
 // What one leg does: the same during/end fields as the robot code's AutoRunner.Leg.
@@ -79,6 +79,7 @@ export const PATCH_SCHEMA = {
           legTimeoutS: { type: ["number", "null"], description: "set_leg: stop driving after this long (null = AutoRunner's default)" },
           carryIntakeS: { type: "number", description: "set_leg, INTAKE/RAMP legs: keep the intake on this long into the next leg" },
           shotTimeoutS: { type: ["number", "null"], description: "set_leg, end SHOOT: skip the shot if not ready within this long (null = default)" },
+          carryRampS: { type: ["number", "null"], description: "set_leg, RAMP legs: keep the ramp out this long into the next leg so it backs out of the FLOWER first (null = default)" },
           heading: { type: "string", enum: ["linear", "constant", "tangent", "reverseTangent"] },
           POLLEN: { type: "integer" },
           onTiles: { type: "integer" },
@@ -163,6 +164,7 @@ function normaliseOp(op: Record<string, unknown>, errors: string[]): PatchOp | n
         ...(num("carryIntakeS") !== undefined ? { carryIntakeS: num("carryIntakeS") } : {}),
         ...(typeof op.heading === "string" ? { heading: op.heading as "linear" } : {}),
         ...(op.shotTimeoutS === null || num("shotTimeoutS") !== undefined ? { shotTimeoutS: op.shotTimeoutS as number | null } : {}),
+        ...(op.carryRampS === null || num("carryRampS") !== undefined ? { carryRampS: op.carryRampS as number | null } : {}),
       };
     case "set_auto":
       if (typeof op.intakeAlways !== "boolean") {
@@ -303,6 +305,8 @@ export function applyPatch(spec: AutoSpec, patch: Patch, source: "ai" | "user" =
         if (op.carryIntakeS !== undefined) l.carryIntakeS = op.carryIntakeS;
         if (op.shotTimeoutS === null) delete l.shotTimeoutS;
         else if (op.shotTimeoutS !== undefined) l.shotTimeoutS = op.shotTimeoutS;
+        if (op.carryRampS === null) delete l.carryRampS;
+        else if (op.carryRampS !== undefined) l.carryRampS = op.carryRampS;
         if (op.heading) {
           if (l.path.type === "toPoint") errors.push(`set_leg ${op.leg}: a straight-to-point leg always turns linearly`);
           else l.heading = headingFor(op.heading, l.path.from, l.path.to);

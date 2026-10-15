@@ -86,6 +86,7 @@ export interface Leg {
   carryIntakeS: number; // Leg.carryIntake(s); 0 = not set
   shotTimeoutS?: number; // Leg.shotTimeout(s), SHOOT; absent = AutoRunner's SHOT_TIMEOUT_S
   waitS?: number; // Leg.waitFor(s), WAIT: how long it holds at the end
+  carryRampS?: number; // Leg.carryRamp(s), RAMP: the ramp stays out this long into the next leg; absent = AutoRunner's RAMP_CARRY_S
   junction: Junction; // why (the AI's evidence for this stop)
   comment?: string;
   optOrder?: string[]; // the order the code wrote the options in (kept on round trip)
@@ -149,6 +150,7 @@ export function stopText(leg: Pick<Leg, "during" | "end" | "waitS">): string {
 export function withStop(leg: Leg, during: During, end: End, source: LegSource, evidence: string[], extra: { note?: string; review?: boolean; waitS?: number } = {}): Leg {
   const out: Leg = { ...leg, during, end, junction: { source, evidence, ...(extra.note ? { note: extra.note } : {}), ...(extra.review ? { review: true } : {}) } };
   if (during === "NONE") out.carryIntakeS = 0;
+  if (during !== "RAMP") delete out.carryRampS;
   if (end !== "SHOOT") delete out.shotTimeoutS;
   if (end !== "WAIT") delete out.waitS;
   else out.waitS = extra.waitS ?? leg.waitS ?? 1;
@@ -172,7 +174,7 @@ export function migrateSpec(spec: AutoSpec): AutoSpec {
       leg.waitS = hold;
     }
     for (const k of ["intakeFromS", "intakeUntilS", "dwellS", "waitAfterS", "turretDeg", "launcher", "carryFirst"]) delete leg[k];
-    if (Array.isArray(leg.optOrder)) leg.optOrder = (leg.optOrder as string[]).filter((o) => ["timeout", "carryIntake"].includes(o));
+    if (Array.isArray(leg.optOrder)) leg.optOrder = (leg.optOrder as string[]).filter((o) => ["timeout", "carryIntake", "carryRamp"].includes(o));
     const j = old.junction ?? { label: null, source: "none", evidence: [] };
     leg.junction = { source: j.source, evidence: j.evidence ?? [], ...(j.note ? { note: j.note } : {}), ...(j.label === "NEEDS_REVIEW" ? { review: true } : {}) };
     return leg as unknown as Leg;
@@ -321,6 +323,8 @@ export function validateSpec(spec: AutoSpec, opts: { fieldSize: number } = { fie
     if (leg.shotTimeoutS !== undefined && leg.end !== "SHOOT") warn("leg.shotTimeout", where, "shot timeout only matters when the leg ends in SHOOT");
     if (leg.end === "WAIT" && !(typeof leg.waitS === "number" && leg.waitS > 0 && leg.waitS <= 30)) err("leg.wait", where, "WAIT needs a time: 0-30 s");
     if (leg.waitS !== undefined && leg.end !== "WAIT") warn("leg.wait", where, "a wait time only matters when the leg ends in WAIT");
+    if (leg.carryRampS !== undefined && !(leg.carryRampS >= 0 && leg.carryRampS <= 3)) err("leg.carryRamp", where, "carryRamp must be 0-3 s");
+    if (leg.carryRampS !== undefined && leg.during !== "RAMP") warn("leg.carryRamp", where, "carryRamp only matters on a RAMP leg");
     if (leg.junction?.review) warn("junction.review", where, `needs review${leg.junction.note ? `: ${leg.junction.note}` : ""}: check what this leg does before writing`);
     if (leg.end === "PARK" && i !== spec.legs.length - 1) warn("leg.parkEarly", where, "PARK ends the auto: legs after it never run");
   });

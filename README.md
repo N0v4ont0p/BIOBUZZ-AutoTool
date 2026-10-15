@@ -82,8 +82,9 @@ Settings until the robot repo's `team-config.yaml` has them.
   driving** (intake on, ramp out) and **at the end** (go on, shoot, wait, park), plus options (timeout,
   carry intake, shot timeout, wait time). Click a leg to open it; click it again, Esc or the empty field
   closes it. **Persistent intake** runs the intake all auto except during shots.
-- **Ramp**: the ramp is shown the way `AutoRunner` moves it: out at the start of a RAMP leg, in at the start of
-  any other leg, before every shot, at PARK, at the end and at the abort time, swinging at the ramp travel time
+- **Ramp**: the ramp is shown the way `AutoRunner` moves it: out at the start of a RAMP leg; after it, it stays out
+  the leg's ramp carry (`carryRamp`, default `RAMP_CARRY_S` 0.5 s) into the next leg so the robot backs out of the
+  FLOWER before it folds; a shot on any other leg, PARK, the end and the abort time fold it at once; it swings at the ramp travel time
   that setup program 4 measures from slow motion (assumed 0.55 s until then). The time bar has a ramp lane (height
   = how far out), the playback robot and every RAMP stop show it, and a FLOWER stack only counts once the ramp is
   fully out. Warnings say when a RAMP leg arrives before the ramp is out (one click adds the WAIT it needs), when it

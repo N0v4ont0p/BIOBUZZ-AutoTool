@@ -375,6 +375,7 @@ export function parseAutoPaths(src: string, symbols: Map<string, number | null>,
           carryIntakeS: carry,
           ...(opt("shotTimeout") !== undefined ? { shotTimeoutS: opt("shotTimeout") as number } : {}),
           ...(opt("waitFor") !== undefined ? { waitS: opt("waitFor") as number } : {}),
+          ...(opt("carryRamp") !== undefined ? { carryRampS: opt("carryRamp") as number } : {}),
           junction: { source: "imported", evidence: [`code=${during}/${end}`] },
         };
         // keep the code's own order only when it differs from AutoTool's
@@ -570,13 +571,14 @@ export function renderLegEntry(leg: Leg, j?: Pick<JavaShape, "legNew" | "enumPre
     ...(leg.carryIntakeS > 0 ? { carryIntake: `.carryIntake(${fmtNum(leg.carryIntakeS, 2)})` } : {}),
     ...(leg.shotTimeoutS !== undefined ? { shotTimeout: `.shotTimeout(${fmtNum(leg.shotTimeoutS, 2)})` } : {}),
     ...(leg.waitS !== undefined ? { waitFor: `.waitFor(${fmtNum(leg.waitS, 2)})` } : {}),
+    ...(leg.carryRampS !== undefined && leg.during === "RAMP" ? { carryRamp: `.carryRamp(${fmtNum(leg.carryRampS, 2)})` } : {}),
   };
   const order = leg.optOrder?.length ? [...leg.optOrder, ...LEG_OPTIONS] : LEG_OPTIONS;
   return s + [...new Set(order)].map((k) => parts[k] ?? "").join("");
 }
 
 // AutoRunner.Leg's builder options, in the order AutoTool writes them
-export const LEG_OPTIONS = ["timeout", "carryIntake", "shotTimeout", "waitFor"];
+export const LEG_OPTIONS = ["timeout", "carryIntake", "carryRamp", "shotTimeout", "waitFor"];
 
 function renderLegs(spec: AutoSpec): string {
   const entries = spec.legs.map((l) => {

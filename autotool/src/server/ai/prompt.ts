@@ -49,7 +49,7 @@ const VOCAB = `# Vocabulary (one term per concept)
 | during | while driving the leg: NONE, INTAKE (the intake runs for the whole path), RAMP (intake + ramp out, POLLEN from a FLOWER bottom, G418) | - |
 | end | when the leg arrives: NONE (go straight on), SHOOT (hold, aim, fire), PARK (hold, the auto ends), WAIT (hold still waitS seconds; intake and ramp keep doing what they did while driving) | - |
 | stop | the end of a leg, named by the leg id (L3 = end of leg 3) | - |
-| leg options | timeout (stop driving after this long), carryIntakeS (INTAKE/RAMP: keep the intake on into the next leg), shotTimeoutS (SHOOT: skip a shot not ready in time), waitS (WAIT: how long); set with set_leg, null clears one | s |
+| leg options | timeout (stop driving after this long), carryIntakeS (INTAKE/RAMP: keep the intake on into the next leg), carryRampS (RAMP: keep the ramp out this long into the next leg so it backs out of the FLOWER before folding; default the profile's ramp carry), shotTimeoutS (SHOOT: skip a shot not ready in time), waitS (WAIT: how long); set with set_leg, null clears one | s |
 | turn | change of travel direction at a stop, signed, counter-clockwise positive | deg |
 | shooting zone | stops where the CELL is inside the shot-table distance band, the turret can reach it, the robot is clear of walls and field elements, and fully on its own side | - |
 | inventory | elements the robot holds; starts at the preload, rises when the intake passes over an element (capped at capacity), falls when a shot fires | elements |
@@ -144,7 +144,7 @@ function packText(pack: SeasonPack): string {
 
 Staged floor elements: ${pack.staged.filter((e) => e.access === "floor").map((e) => `${e.id} ${e.type} (${e.x}, ${e.y})`).join("; ")}.
 FLOWER stacks (4 POLLEN each) come out only from the FLOWER bottom with the ramp (G418): only a during RAMP leg deploys it, and the field map cannot confirm a pick, so they never count in the inventory.
-The ramp takes the robot's ramp travel time (profile) to swing out from the start of the RAMP leg, and only takes a stack once it is fully out: a RAMP leg that arrives early needs a WAIT long enough for it ({Ln.rampOnArrival} is the percent out on arrival, {Ln.rampOut} when it is fully out). Any other leg, every SHOOT and PARK fold it back in.
+The ramp takes the robot's ramp travel time (profile) to swing out from the start of the RAMP leg, and only takes a stack once it is fully out: a RAMP leg that arrives early needs a WAIT long enough for it ({Ln.rampOnArrival} is the percent out on arrival, {Ln.rampOut} when it is fully out). It folds the RAMP leg's carryRampS into the next leg (unless that leg is a RAMP leg too), so the robot backs out of the FLOWER first; a SHOOT on any other leg and PARK fold it at once. A SHOOT ending a RAMP leg keeps it out, with the intake off.
 Rules: AUTO is ${pack.rules.autoDurationS} s. Max ${pack.rules.maxControlled.value} elements held (${pack.rules.maxControlled.rule}). Preload ${pack.rules.preload.POLLEN} POLLEN (${pack.rules.preload.rule}). ${pack.rules.autoSide.rule}: ${pack.rules.autoSide.text}. Human feed in AUTO: ${pack.rules.humanFeed.default} (${pack.rules.humanFeed.rule}); never count on it.
 Scoring in AUTO: LEAVE 3 (off the wall at the end), PARK 5 (at least partially in the LOADING ZONE), HIVE TIP 20 (3 POLLEN tip the staged up-CELL).`;
 }

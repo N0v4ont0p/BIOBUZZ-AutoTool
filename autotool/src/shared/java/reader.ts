@@ -360,7 +360,7 @@ export interface Step {
   end?: "NONE" | "SHOOT" | "PARK" | "WAIT";
   timeoutS?: number;
   carryS?: number;
-  opts?: { shotTimeoutS?: number; waitS?: number };
+  opts?: { shotTimeoutS?: number; waitS?: number; carryRampS?: number };
 }
 
 export interface ReadResult {
@@ -1017,6 +1017,8 @@ function legSteps(list: V, file: string): Step[] {
       if (shot !== undefined) opts.shotTimeoutS = shot;
       const wait = num(c("waitFor"));
       if (wait !== undefined) opts.waitS = wait;
+      const rampCarry = num(c("carryRamp"));
+      if (rampCarry !== undefined) opts.carryRampS = rampCarry;
     } else if (it.t === "inst" && /Leg$/.test(it.cls.name)) {
       vals = [...it.fields.values()];
       const f = (re: RegExp) => [...it.fields.entries()].find(([k]) => re.test(k))?.[1];
@@ -1042,6 +1044,7 @@ function legSteps(list: V, file: string): Step[] {
     }
     if (end !== "SHOOT") delete opts.shotTimeoutS;
     if (end !== "WAIT") delete opts.waitS;
+    if (during !== "RAMP") delete opts.carryRampS;
     const action = during === "NONE" ? end : end === "NONE" ? during : `${during} -> ${end}`;
     const path = vals.find((a): a is PathV => a.t === "path");
     const target = vals.find((a): a is PoseV => a.t === "pose");
