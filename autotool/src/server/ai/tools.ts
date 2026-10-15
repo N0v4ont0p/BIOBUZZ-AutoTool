@@ -114,10 +114,18 @@ function pointsLine(pack: SeasonPack, f: AutoFeatures): string {
   return `AUTO points (Table 10-2): ${p.total} = LEAVE ${p.leave} + PARK ${p.park} + HIVE TIP ${p.tipPoints}${p.tips.length ? ` (TIP at ${p.tips.map((t) => t.legId).join(", ")})` : ""}. Only POLLEN into the upward-facing CELL tips the HIVE; after a TIP the other CELL faces up and needs ${pack.scoring.tipPollenByNectar.table[0]} POLLEN.${p.notes.length ? ` Notes: ${p.notes.join("; ")}.` : ""}`;
 }
 
+// the ramp on a leg, as AutoRunner moves it at its measured speed
+function rampText(l: AutoFeatures["legs"][number]): string {
+  if (l.during !== "RAMP" && l.ramp.maxOut <= 0.02) return "";
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  if (l.during !== "RAMP") return `, ramp stowing (${pct(l.ramp.atStart)} out at the start)`;
+  return `, ramp ${pct(l.ramp.atStart)} out at the start, ${pct(l.ramp.atArrival)} on arrival, ${l.ramp.outAtS !== null ? `fully out at ${l.ramp.outAtS} s` : "never fully out"}${l.ramp.late.length ? `, reaches ${l.ramp.late.join(",")} before it is out` : ""}`;
+}
+
 export function featuresText(f: AutoFeatures, m: RobotModel, hint: boolean, pack?: SeasonPack): string {
   const sheet = featureSheet(f);
   const where = pack ? ["This route on the field (S start, 1-9/a-z = junctions L1, L2, ...):", "```", fieldMap(pack, f), "```", "", "Where each stop is:", routeWords(pack, f), ""] : [];
-  const legs = f.legs.map((l) => `${l.id}: ${stopText(l)} ${round(l.lengthIn)} in, ${round(l.travelS)} s${l.timesOut ? " (TIMES OUT)" : ""}${l.cut !== "none" ? ` (cut by abort: ${l.cut})` : ""}${l.picked.length ? `, picks ${l.picked.map((p) => p.id).join(",")}` : ""}${l.sweepable.length ? `, sweeps ${l.sweepable.join(",")}` : ""}`);
+  const legs = f.legs.map((l) => `${l.id}: ${stopText(l)} ${round(l.lengthIn)} in, ${round(l.travelS)} s${l.timesOut ? " (TIMES OUT)" : ""}${l.cut !== "none" ? ` (cut by abort: ${l.cut})` : ""}${l.picked.length ? `, picks ${l.picked.map((p) => p.id).join(",")}` : ""}${l.sweepable.length ? `, sweeps ${l.sweepable.join(",")}` : ""}${rampText(l)}`);
   return [
     ...where,
     "Junction evidence (copy these tokens):",

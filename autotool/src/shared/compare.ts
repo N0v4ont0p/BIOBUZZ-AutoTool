@@ -3,7 +3,7 @@
 // two footprints are compared. Times are AutoTool's estimates, so a partner running up to `tolS` early or late
 // counts too: that is a near miss, as is coming closer than `marginIn`.
 
-import { type AutoFeatures, computeFeatures, poseAtTime } from "./features.ts";
+import { type AutoFeatures, computeFeatures, poseAtTime, rampOutAt, rampPolygon } from "./features.ts";
 import { type Vec, footprint, pointSegmentDistance, polygonsOverlap } from "./geometry.ts";
 import type { RobotModel } from "./profile.ts";
 import type { SeasonPack } from "./season.ts";
@@ -58,6 +58,18 @@ export function footprintGap(a: Vec[], b: Vec[]): number {
   return d;
 }
 
+// A robot's outline at time t: its frame, plus its ramp while the ramp is (partly) out.
+function shapesAt(f: AutoFeatures, m: RobotModel, pose: { x: number; y: number; headingDeg: number }, t: number): Vec[][] {
+  const out = f.ramp.moves.length ? rampOutAt(f.ramp.moves, f.ramp.travelS, t) : 0;
+  return out > 0.02 ? [footprint(pose, m.body), rampPolygon(pose, m, out)] : [footprint(pose, m.body)];
+}
+
+function shapesGap(a: Vec[][], b: Vec[][]): number {
+  let d = Infinity;
+  for (const p of a) for (const q of b) d = Math.min(d, footprintGap(p, q));
+  return d;
+}
+
 const STEP = 0.05;
 const r1 = (v: number) => Math.round(v * 10) / 10;
 
@@ -76,14 +88,14 @@ export function compareRuns(ours: AutoFeatures, ourModel: RobotModel, theirs: Au
     const a = poseAtTime(ours, t);
     const b = poseAtTime(theirs, t - o.delayS);
     if (!a || !b) continue;
-    const fa = footprint(a, ourModel.body);
-    const gap = footprintGap(fa, footprint(b, theirModel.body));
+    const fa = shapesAt(ours, ourModel, a, t);
+    const gap = shapesGap(fa, shapesAt(theirs, theirModel, b, t - o.delayS));
     if (!closest || gap < closest.gapIn) closest = { gapIn: gap, t };
     // the partner a little early or late
     let tolGap = gap;
     for (const d of offsets) {
       const bb = poseAtTime(theirs, t - o.delayS + d);
-      if (bb) tolGap = Math.min(tolGap, footprintGap(fa, footprint(bb, theirModel.body)));
+      if (bb) tolGap = Math.min(tolGap, shapesGap(fa, shapesAt(theirs, theirModel, bb, t - o.delayS + d)));
     }
     const atStart = t < STEP / 2;
     const parked = a.phase === "done" && b.phase === "done";

@@ -589,6 +589,77 @@ test("features: a RAMP leg takes POLLEN from a FLOWER stack, an INTAKE leg does 
   assert.ok(short.junctions[0].flags.some((f) => /RAMP leg takes nothing: it ends 12\.5 in from the FLOWER F3/.test(f)), short.junctions[0].flags.join("|"));
 });
 
+test("ramp: AutoRunner's commands at the servo's travel time; late, waited-for, never out; positions; R105", async () => {
+  const { rampOutAt } = await import("../src/shared/features.ts");
+  // reversing mid-swing turns back from where it is
+  const moves = [
+    { t: 0, out: true, why: "", legId: null },
+    { t: 0.2, out: false, why: "", legId: null },
+  ];
+  assert.ok(Math.abs(rampOutAt(moves, 0.5, 0.2) - 0.4) < 1e-9);
+  assert.ok(Math.abs(rampOutAt(moves, 0.5, 0.3) - 0.2) < 1e-9);
+  assert.equal(rampOutAt(moves, 0.5, 1), 0);
+
+  // a RAMP leg straight at the F3 stack: start `fromX`, stop at x = 129 (the ramp reaches it, the intake does not)
+  const run = (fromX: number, end: "NONE" | "WAIT" | "SHOOT", waitS: number | null, set: Record<string, number | string> = {}) => {
+    const s = sampleSpec();
+    s.preload.POLLEN = 0;
+    Object.assign(s.poses.find((x) => x.name === "shot1")!, { x: 129, y: 96, headingDeg: 0 });
+    Object.assign(s.poses.find((x) => x.name === "start")!, { x: fromX, y: 96, headingDeg: 0 });
+    s.legs[0] = { ...s.legs[0], during: "RAMP", end, ...(waitS !== null ? { waitS } : {}) };
+    const facts = defaultFacts();
+    facts.rampReachIn.value = 4;
+    facts.intakeReachIn.value = 1;
+    facts.rampTravelS.value = 0.55;
+    for (const [k, v] of Object.entries(set)) facts[k].value = v;
+    return computeFeatures(s, pack, robotModel(facts));
+  };
+  // a long approach: out before it gets there, so it takes the stack
+  const far = run(110, "NONE", null);
+  assert.equal(far.legs[0].picked.length, 4);
+  assert.deepEqual(far.ramp.moves.map((m) => `${m.legId}:${m.out ? "out" : "in"}`), ["L1:out", "L2:in"]);
+  assert.equal(far.ramp.moves[0].t, 0);
+  assert.equal(far.legs[0].ramp.outAtS, 0.55);
+  assert.equal(far.legs[0].ramp.atArrival, 1);
+  // a 2 in hop gets there in about 0.5 s: the ramp is not out yet, and L2 folds it back in
+  const near = run(127, "NONE", null);
+  assert.ok(near.legs[0].ramp.atArrival < 1 && near.legs[0].ramp.atArrival > 0.8, String(near.legs[0].ramp.atArrival));
+  assert.equal(near.legs[0].picked.length, 0);
+  assert.deepEqual(near.legs[0].ramp.late, ["F3s"]);
+  assert.ok(near.problems.some((p) => p.code === "ramp.late" && p.where === "leg:L1"), near.problems.map((p) => p.code).join(","));
+  // ...a WAIT long enough lets it come out and take the stack, at the moment it is out
+  const waited = run(127, "WAIT", 0.3);
+  assert.equal(waited.legs[0].picked.length, 4);
+  assert.equal(waited.legs[0].picked[0].atS, 0.55);
+  assert.deepEqual(waited.legs[0].ramp.late, []);
+  assert.ok(!waited.problems.some((p) => p.code.startsWith("ramp.late")));
+  // ...a SHOOT folds it in on arrival: never fully out
+  const shot = run(127, "SHOOT", null);
+  assert.equal(shot.legs[0].ramp.outAtS, null);
+  assert.ok(Math.abs(shot.ramp.moves[1].t - shot.legs[0].travelS) < 1e-9);
+  assert.equal(shot.ramp.moves[1].why, "L1 stows it to shoot");
+  // the robot never moves it until program 4 has put both positions in the code
+  assert.ok(far.problems.some((p) => p.code === "ramp.positions"));
+  assert.ok(!run(110, "NONE", null, { rampPositions: "set" }).problems.some((p) => p.code === "ramp.positions"));
+  // out, the ramp makes the robot longer: over 18 x 24 in breaks R105
+  assert.ok(!far.problems.some((p) => p.code === "rule.R105"));
+  const long = run(110, "NONE", null, { rampReachIn: 7 });
+  assert.equal(long.ramp.expanded?.lengthIn, 25);
+  assert.ok(long.problems.some((p) => p.code === "rule.R105" && p.level === "error"));
+  // a RAMP leg that starts at an odd time (after a shot): out 0.55 s after its own start, never "never out"
+  const s2 = sampleSpec();
+  s2.legs[1] = { ...s2.legs[1], during: "RAMP" };
+  const odd = computeFeatures(s2, pack, model);
+  const l2 = odd.legs[1];
+  assert.ok(l2.startS % 0.001 > 1e-6, String(l2.startS));
+  assert.ok(Math.abs(l2.ramp.outAtS! - (Math.round((l2.startS + 0.55) * 100) / 100)) < 1e-9, JSON.stringify(l2.ramp));
+  assert.ok(!odd.problems.some((p) => p.code === "ramp.neverOut"), odd.problems.map((p) => p.message).join("|"));
+  // an auto without a RAMP leg never moves it
+  const none = computeFeatures(sampleSpec(), pack, model);
+  assert.equal(none.ramp.used, false);
+  assert.deepEqual(none.ramp.moves, []);
+});
+
 test("partner: two autos of one alliance run together; collisions, near misses, shared elements, one-click fixes", async () => {
   const { DEFAULT_PARTNER, compareRuns, findFix, partnerModel, addWait } = await import("../src/shared/compare.ts");
   const ours = sampleSpec();
@@ -689,6 +760,10 @@ test("profile merge: code values confirm themselves; the team is asked only abou
   assert.deepEqual([r.facts.settleS.status, r.facts.settleS.confirmed], ["assumed", false]);
   assert.equal(r.facts.feedS.confirmed, true);
   assert.deepEqual(r.changed.map((c) => [c.key, c.needsYou]), [["abortAtS", false], ["legTimeoutS", true], ["settleS", true]]);
+  // a fact a newer AutoTool reads (here the ramp travel time) is in use at once and announced, not a new setup
+  const added = mergeFacts(old, { ...fresh, rampTravelS: f("rampTravelS", { status: "assumed", confirmed: false }) });
+  assert.equal(added.facts.rampTravelS.confirmed, true);
+  assert.deepEqual(added.changed.find((c) => c.key === "rampTravelS"), { key: "rampTravelS", label: "Ramp travel time (folded in to out)", from: "new", to: "assumed 0.55 s", needsYou: false });
   // the first scan confirms nothing by itself (setup asks once)
   assert.equal(mergeFacts(undefined, fresh).facts.abortAtS.confirmed, false);
 });

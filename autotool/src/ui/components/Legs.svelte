@@ -58,6 +58,27 @@
   function setRamp(leg: Leg, on: boolean) {
     edit((s) => setStop(s, leg.id, on ? "RAMP" : leg.during === "RAMP" ? "INTAKE" : leg.during, leg.end));
   }
+  // the ramp on a leg, in words, and the wait a RAMP leg needs for the ramp to be fully out before it moves on
+  function rampLine(leg: Leg, lf: AutoFeatures["legs"][number]): { text: string; bad: boolean; needWaitS: number | null } | null {
+    const r = lf.ramp;
+    const pct = (v: number) => `${Math.round(v * 100)}%`;
+    if (leg.during !== "RAMP") return r.maxOut > 0.02 ? { text: `folding in: ${pct(r.atStart)} out when this leg starts`, bad: false, needWaitS: null } : null;
+    const swing = features.ramp.travelS;
+    const head = `comes out at the leg start (${swing} s swing): ${pct(r.atArrival)} out on arrival`;
+    if (r.late.length || r.outAtS === null) {
+      const need = Math.ceil((1 - r.atArrival) * swing * 10) / 10;
+      const canWait = leg.end === "NONE" || leg.end === "WAIT";
+      return {
+        text: `${head}, ${r.outAtS === null ? "never fully out on this leg" : `fully out at ${r.outAtS} s`}${r.late.length ? `; reaches ${r.late.join(", ")} before it is out` : ""}${canWait ? "" : " (the shot folds it in on arrival)"}`,
+        bad: true,
+        needWaitS: canWait && need > (leg.end === "WAIT" ? (leg.waitS ?? 0) : 0) ? need : null,
+      };
+    }
+    return { text: `${head}, fully out at ${r.outAtS} s`, bad: false, needWaitS: null };
+  }
+  function waitForRamp(leg: Leg, s: number) {
+    edit((sp) => setOption(setStop(sp, leg.id, leg.during, "WAIT"), leg.id, "waitS", s));
+  }
   function setEnd(leg: Leg, end: End) {
     edit((s) => setStop(s, leg.id, leg.during, end));
   }
@@ -253,6 +274,10 @@
         <span class="what">{stopText(leg)}</span>
         {#if lf}<span class="muted num">{lf.travelS.toFixed(1)}{lf.endActionS || (leg.end === "WAIT" && leg.waitS) ? `+${(lf.endActionS + (leg.end === "WAIT" ? (leg.waitS ?? 0) : 0)).toFixed(1)}` : ""} s</span>{/if}
         {#if j}<span class="muted num">{j.inventory.before}→{j.inventory.after}</span>{/if}
+        {#if lf && (leg.during === "RAMP" || lf.ramp.maxOut > 0.02)}
+          {@const rl = rampLine(leg, lf)}
+          <span class="rampgauge" class:bad={rl?.bad} class:off={!features.ramp.calibrated} title={`ramp: ${rl?.text ?? ""}`}><span style:width="{Math.round((leg.during === "RAMP" ? lf.ramp.atArrival : lf.ramp.atStart) * 100)}%"></span></span>
+        {/if}
         {#if j?.flags.length || leg.junction.review}<span class="flagdot" title={[...(j?.flags ?? []), ...(leg.junction.note ? [leg.junction.note] : [])].join("\n")}>!</span>{/if}
       </button>
       {#if prop && legKey(prop) !== legKey(leg)}<div class="proposal">proposed: <strong>{stopText(prop)}</strong></div>{/if}
@@ -274,6 +299,16 @@
               {/each}
             </span>
           </div>
+          {#if lf && (leg.during === "RAMP" || lf.ramp.maxOut > 0.02)}
+            {@const rl = rampLine(leg, lf)}
+            {#if rl}
+              <div class="f"><span class="k">Ramp</span>
+                <span class:rampbad={rl.bad}>{rl.text}{#if !features.ramp.calibrated}<span class="muted"> · positions not in the robot code yet: the robot keeps it in</span>{/if}
+                  {#if rl.needWaitS !== null}<button class="fixramp" onclick={() => waitForRamp(leg, rl.needWaitS!)} title="End this leg with a WAIT long enough for the ramp to be fully out">Wait {rl.needWaitS} s for it</button>{/if}
+                </span>
+              </div>
+            {/if}
+          {/if}
           {#if leg.end === "WAIT"}
             <div class="f"><span class="k">Wait</span><span><input type="number" step="0.1" min="0.1" max="30" value={leg.waitS ?? ""} onchange={(e) => edit((s) => setOption(s, leg.id, "waitS", num(e.currentTarget.value)))} aria-label="wait (s)" /> s</span></div>
           {/if}
@@ -689,5 +724,37 @@
   .slot.end {
     height: 26px;
     margin-top: 6px;
+  }
+  .rampgauge {
+    display: inline-block;
+    width: 22px;
+    height: 6px;
+    border-radius: 2px;
+    background: #1b1d21;
+    border: 1px solid #a3e635;
+    overflow: hidden;
+    vertical-align: middle;
+  }
+  .rampgauge span {
+    display: block;
+    height: 100%;
+    background: #a3e635;
+  }
+  .rampgauge.bad {
+    border-color: var(--unsure);
+  }
+  .rampgauge.bad span {
+    background: var(--unsure);
+  }
+  .rampgauge.off span {
+    background: #8b8f97;
+  }
+  .rampbad {
+    color: var(--unsure);
+  }
+  .fixramp {
+    margin-left: 6px;
+    font-size: 12px;
+    padding: 1px 6px;
   }
 </style>

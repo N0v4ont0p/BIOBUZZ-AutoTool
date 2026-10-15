@@ -82,6 +82,13 @@ Settings until the robot repo's `team-config.yaml` has them.
   driving** (intake on, ramp out) and **at the end** (go on, shoot, wait, park), plus options (timeout,
   carry intake, shot timeout, wait time). Click a leg to open it; click it again, Esc or the empty field
   closes it. **Persistent intake** runs the intake all auto except during shots.
+- **Ramp**: the ramp is shown the way `AutoRunner` moves it: out at the start of a RAMP leg, in at the start of
+  any other leg, before every shot, at PARK, at the end and at the abort time, swinging at the ramp travel time
+  that setup program 4 measures from slow motion (assumed 0.55 s until then). The time bar has a ramp lane (height
+  = how far out), the playback robot and every RAMP stop show it, and a FLOWER stack only counts once the ramp is
+  fully out. Warnings say when a RAMP leg arrives before the ramp is out (one click adds the WAIT it needs), when it
+  never gets out, when it reaches into a wall, when the robot code has no ramp positions yet (the robot then never
+  moves it) and when the ramp makes the robot longer than 18 x 24 in (R105). Partner collision checks include it.
 - **AUTO points**: the top of the Legs list counts the auto the way Table 10-2 does (LEAVE 3, PARK 5,
   HIVE TIP 20 when POLLEN reach the upward-facing CELL) and shows what each leg adds.
 - **AI**: **Decide every leg** asks Claude what each leg should do from the field and the evidence;

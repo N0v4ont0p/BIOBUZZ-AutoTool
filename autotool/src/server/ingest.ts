@@ -54,6 +54,17 @@ export function factsFromDigest(d: Digest, pack: SeasonPack): Record<string, Fac
   set("yawMinDeg", fromConstant(d, "Tuned.yawMinDeg", "Yaw Tuner G-1 part A"), "CAD sheet C-6 asks for stops past 90 deg");
   set("yawMaxDeg", fromConstant(d, "Tuned.yawMaxDeg", "Yaw Tuner G-1 part A"), "CAD sheet C-6 asks for stops past 90 deg");
   set("gateTravelS", fromConstant(d, "Tuned.gateTravelS", "E-8"));
+  set("rampTravelS", fromConstant(d, "Tuned.rampTravelS", "program 4, slow motion"));
+  const rs = d.constants["Tuned.rampStowed"];
+  const rd = d.constants["Tuned.rampDeployed"];
+  if (rs && rd) {
+    const both = rs.value !== null && rd.value !== null;
+    set("rampPositions", {
+      value: both ? "set" : "not set",
+      status: "code",
+      source: both ? `${rs.file}:${rs.line} rampStowed = ${rs.expr}, rampDeployed = ${rd.expr}` : `${rs.file}:${rs.line} rampStowed / rampDeployed are NaN (program 4): AutoRunner never moves the ramp until they are set`,
+    });
+  }
   const tf = d.constants["Tuned.yawTicksPerDegFront"];
   const tb = d.constants["Tuned.yawTicksPerDegBack"];
   if (tf && tb) {
@@ -155,7 +166,9 @@ export function mergeFacts(old: Record<string, Fact> | undefined, fresh: Record<
     const n = fresh[key];
     const o = old[key];
     if (!o) {
-      out[key] = { ...n, confirmed: fromSource(n.status) };
+      // a fact a newer AutoTool reads: in use at once and announced, never a reason to redo the setup
+      out[key] = { ...n, confirmed: true };
+      changed.push({ key, label: n.label, from: "new", to: `${n.status === "assumed" ? "assumed " : ""}${n.value} ${n.unit}`.trim(), needsYou: false });
       continue;
     }
     const repoMoved = o.repoValue !== n.repoValue && !(o.repoValue === undefined && n.repoValue === undefined);

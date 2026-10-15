@@ -36,6 +36,7 @@ export interface SeasonPack {
     flower: { rule: string; text: string };
     humanFeed: { rule: string; default: string; text: string };
     startConfig: { rule: string; cubeIn: number };
+    expanded?: { rule: string; maxFootprintIn: [number, number] };
   };
   // Table 10-2 point values (AUTO column), and the POLLEN that tip a CELL by the NECTAR in it
   scoring: {

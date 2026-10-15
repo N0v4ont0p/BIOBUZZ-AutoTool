@@ -50,6 +50,8 @@ export const FACT_DEFAULTS: Omit<Fact, "status" | "source" | "confirmed">[] = [
   { key: "intakeReachIn", label: "Intake reach past the front edge", value: 2, unit: "in", group: "robot" },
   { key: "intakeWidthIn", label: "Intake mouth width", value: 18, unit: "in", group: "robot", note: "the part of the front that takes elements; the full robot width until the CAD gives it" },
   { key: "rampReachIn", label: "Ramp reach past the front edge (deployed)", value: 2, unit: "in", group: "robot", note: "same as the intake until the CAD gives the ramp length (R105: the ramp stays inside 18 x 24 in)" },
+  { key: "rampTravelS", label: "Ramp travel time (folded in to out)", value: 0.55, unit: "s", group: "robot", note: "a speed servo swings the ramp about 145 deg in about half a second; program 4 times it from slow motion" },
+  { key: "rampPositions", label: "Ramp servo positions in the code", value: "not set", unit: "", group: "robot", note: "rampStowed / rampDeployed from program 4: until both are set AutoRunner never moves the ramp" },
   { key: "elementsPerShot", label: "Elements one SHOOT sends", value: "all", unit: "", group: "shooter", note: "AutoRunner feeds for FEED_S with both gates open" },
   { key: "centerToFront", label: "Robot centre to front edge", value: 9, unit: "in", group: "robot" },
   { key: "centerToBack", label: "Robot centre to back edge", value: 9, unit: "in", group: "robot" },
@@ -124,6 +126,8 @@ export interface RobotModel {
   intakeReachIn: number;
   intakeWidthIn: number;
   rampReachIn: number;
+  rampTravelS: number;
+  rampCalibrated: boolean; // Tuned.rampStowed and rampDeployed set: AutoRunner can move the ramp
   elementsPerShot: number; // Infinity = all held
   body: { front: number; back: number; left: number; right: number };
   frontPivot: { x: number; y: number };
@@ -168,6 +172,8 @@ export function robotModel(facts: Record<string, Fact>): RobotModel {
     intakeReachIn: n("intakeReachIn"),
     intakeWidthIn: n("intakeWidthIn"),
     rampReachIn: n("rampReachIn"),
+    rampTravelS: n("rampTravelS"),
+    rampCalibrated: facts.rampPositions?.value === "set",
     elementsPerShot: eps === "all" || eps === undefined ? Infinity : Number(eps),
     body: { front: n("centerToFront"), back: n("centerToBack"), left: n("centerToLeft"), right: n("centerToRight") },
     frontPivot: { x: n("frontPivotX"), y: n("frontPivotY") },

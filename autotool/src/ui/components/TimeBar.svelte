@@ -1,14 +1,19 @@
 <script lang="ts">
   import type { Conflict } from "../../shared/compare.ts";
   import type { AutoFeatures } from "../../shared/features.ts";
-  import { heldAt, poseAtTime } from "../../shared/features.ts";
+  import { heldAt, poseAtTime, rampOutAt } from "../../shared/features.ts";
   import type { AutoSpec } from "../../shared/spec.ts";
   import { legLook } from "../draw.ts";
   import { app } from "../state.svelte.ts";
 
   let { features, spec, partner = null }: { features: AutoFeatures; spec: AutoSpec; partner?: { name: string; features: AutoFeatures; delayS: number; conflicts: Conflict[] } | null } = $props();
-  const H = $derived(partner ? 60 : 46); // a second row for the partner
-  const tickY = $derived(partner ? 58 : 44);
+  // a lane for the ramp when the auto uses it, and a second row for the partner
+  const rampLane = $derived(features.ramp.used);
+  const RY = 33; // ramp lane top
+  const RH = 9; // ramp lane height (full height = fully out)
+  const dy = $derived(rampLane ? 12 : 0);
+  const H = $derived((partner ? 60 : 46) + dy);
+  const tickY = $derived((partner ? 58 : 44) + dy);
 
   let width = $state(1000);
   const W = $derived(Math.max(300, width));
@@ -67,6 +72,28 @@
   }
   const at = $derived(poseAtTime(features, app.scrubT));
   const held = $derived(heldAt(features, app.scrubT));
+  const rampNow = $derived(rampLane ? rampOutAt(features.ramp.moves, features.ramp.travelS, app.scrubT) : 0);
+  const rampWord = $derived.by(() => {
+    if (!rampLane) return "";
+    const seg = features.ramp.segments.find((s) => app.scrubT >= s.fromS - 1e-9 && app.scrubT < s.toS - 1e-9);
+    const state = seg?.state ?? (rampNow >= 0.999 ? "out" : "in");
+    return state === "deploying" || state === "stowing" ? `${state} ${Math.round(rampNow * 100)}%` : state;
+  });
+  // the ramp lane as an area: its height is how far out the ramp is
+  const rampArea = $derived.by(() => {
+    if (!rampLane) return "";
+    const base = RY + RH;
+    const pts: string[] = [`${X(0)},${base}`];
+    for (const s of features.ramp.segments) {
+      pts.push(`${X(Math.min(span, s.fromS))},${base - RH * s.fromOut}`, `${X(Math.min(span, s.toS))},${base - RH * s.toOut}`);
+    }
+    const end = features.ramp.segments.at(-1);
+    pts.push(`${X(Math.min(span, end?.toS ?? 0))},${base}`);
+    return pts.join(" ");
+  });
+  const segTitle = (s: (typeof features.ramp.segments)[number]) =>
+    `ramp ${s.state} ${s.fromS.toFixed(2)}–${s.toS.toFixed(2)} s${s.state === "deploying" || s.state === "stowing" ? ` (${Math.round(s.fromOut * 100)}% → ${Math.round(s.toOut * 100)}%)` : ""}`;
+  const rampFact = $derived(app.server?.profile?.facts?.rampTravelS);
   const fill: Record<string, string> = { drive: "#8b8f97", intake: "var(--intake)", ramp: "#a3e635", reposition: "var(--repo)", unsure: "var(--unsure)" };
 </script>
 
@@ -74,7 +101,7 @@
   <div class="readout" aria-live="polite">
     <button class="play" onclick={play} aria-label={app.playing ? "Pause" : "Play"} title={partner ? "Play both robots together" : "Play the auto"}>{app.playing ? "❚❚" : "▶"}</button>
     <strong>t = {app.scrubT.toFixed(1)} s</strong>
-    {#if at}<span>{at.legId ?? "done"} · {at.phase === "action" ? "at the stop" : at.phase === "travel" ? "driving" : "finished"} · holding {held}</span>{/if}
+    {#if at}<span>{at.legId ?? "done"} · {at.phase === "action" ? "at the stop" : at.phase === "travel" ? "driving" : "finished"} · holding {held}{#if rampLane}{" · "}<span class="rampword" class:out={rampNow >= 0.999} class:moving={rampNow > 0.001 && rampNow < 0.999} class:off={!features.ramp.calibrated} title={features.ramp.calibrated ? "" : "the ramp positions are not in the robot code yet: the robot keeps it folded in"}>ramp {rampWord}{features.ramp.calibrated ? "" : " (not set in the code)"}</span>{/if}</span>{/if}
     <span class="tot" class:over={features.timeline.nominalS > features.timeline.autoS}>total {features.timeline.nominalS.toFixed(1)} s · worst {features.timeline.worstS.toFixed(1)} s</span>
     {#if guessed}<span class="guess" title="Measured by program 5 (top speed) once the robot is tuned; until then the drive times are a safe guess">drive times assume {guessed}</span>{/if}
   </div>
@@ -114,6 +141,18 @@
         <line x1={x2} y1="10" x2={x2} y2="32" stroke="#000" stroke-width="1.5" />
       </g>
     {/each}
+    {#if rampLane}
+      <!-- the ramp: height = how far out (AutoRunner's commands at the servo's travel time) -->
+      <rect x={L} y={RY} width={W - 20 - L - R} height={RH} class="ramptrack" />
+      <polygon points={rampArea} class="ramparea" class:off={!features.ramp.calibrated} />
+      {#each features.ramp.segments as s}
+        {#if s.state !== "in"}<rect x={X(Math.min(span, s.fromS))} y={RY} width={Math.max(0.5, X(Math.min(span, s.toS)) - X(Math.min(span, s.fromS)))} height={RH} class="rampseg"><title>{segTitle(s)}</title></rect>{/if}
+      {/each}
+      {#each features.ramp.moves as m}
+        <line x1={X(Math.min(span, m.t))} y1={RY - 1} x2={X(Math.min(span, m.t))} y2={RY + RH + 1} class="rampmove"><title>{m.t.toFixed(2)} s: {m.out ? "out" : "in"} ({m.why})</title></line>
+      {/each}
+      <text x="2" y={RY + RH - 0.5} class="plabel ramplabel">R<title>Ramp: {features.ramp.calibrated ? "" : "positions not set in the robot code yet (program 4), so the robot keeps it folded in; "}swing {features.ramp.travelS} s{rampFact?.status === "assumed" ? " (assumed until program 4 times it)" : ""}</title></text>
+    {/if}
     <!-- worst case -->
     <line x1={X(Math.min(span, features.timeline.worstS))} y1="8" x2={X(Math.min(span, features.timeline.worstS))} y2="34" class="worst" />
     <!-- abort and the end of auto -->
@@ -125,21 +164,21 @@
       {#each partner.features.legs as l}
         {@const x0 = X(l.startS + partner.delayS)}
         {@const x2 = X(l.endS + partner.delayS)}
-        <rect x={x0} y="36" width={Math.max(0.5, x2 - x0)} height="10" class="pseg" />
-        <line x1={x2} y1="35" x2={x2} y2="47" stroke="#000" stroke-width="1.5" />
-        {#if x2 - x0 > 30}<text x={(x0 + x2) / 2} y="43.5" text-anchor="middle" class="segtext small">{l.id}</text>{/if}
+        <rect x={x0} y={36 + dy} width={Math.max(0.5, x2 - x0)} height="10" class="pseg" />
+        <line x1={x2} y1={35 + dy} x2={x2} y2={47 + dy} stroke="#000" stroke-width="1.5" />
+        {#if x2 - x0 > 30}<text x={(x0 + x2) / 2} y={43.5 + dy} text-anchor="middle" class="segtext small">{l.id}</text>{/if}
       {/each}
-      {#if partner.delayS > 0}<rect x={X(0)} y="36" width={X(partner.delayS) - X(0)} height="10" class="pwait" />{/if}
-      <text x="2" y="44" class="plabel">P</text>
+      {#if partner.delayS > 0}<rect x={X(0)} y={36 + dy} width={X(partner.delayS) - X(0)} height="10" class="pwait" />{/if}
+      <text x="2" y={44 + dy} class="plabel">P</text>
       {#each bands as c}
-        <rect x={X(c.from) - 1} y="10" width={Math.max(2, X(c.to) - X(c.from) + 2)} height="38" class="band" class:near={c.kind === "nearMiss"}><title>{c.text}</title></rect>
+        <rect x={X(c.from) - 1} y="10" width={Math.max(2, X(c.to) - X(c.from) + 2)} height={38 + dy} class="band" class:near={c.kind === "nearMiss"}><title>{c.text}</title></rect>
       {/each}
     {/if}
     {#each Array.from({ length: Math.floor(span / 5) + 1 }, (_, i) => i * 5) as t}
       <text x={X(t)} y={tickY} text-anchor="middle" class="tick">{t}</text>
     {/each}
     <!-- scrubber -->
-    <line x1={X(app.scrubT)} y1="2" x2={X(app.scrubT)} y2={partner ? 48 : 36} class="scrub" />
+    <line x1={X(app.scrubT)} y1="2" x2={X(app.scrubT)} y2={(partner ? 48 : 36) + dy} class="scrub" />
     <rect x={X(app.scrubT) - 4} y="0" width="8" height="8" rx="2" class="scrubknob" />
   </svg>
 </div>
@@ -156,6 +195,11 @@
     font-size: 13px;
     align-items: baseline;
     color: var(--muted);
+  }
+  .readout strong,
+  .readout .tot,
+  .rampword {
+    white-space: nowrap;
   }
   .readout strong {
     color: var(--text);
@@ -253,6 +297,44 @@
     fill: rgb(239 68 68 / 0.35);
     stroke: var(--shoot);
     stroke-width: 1;
+  }
+  .ramptrack {
+    fill: #1b1d21;
+  }
+  .ramparea {
+    fill: #a3e635;
+    fill-opacity: 0.85;
+    stroke: #a3e635;
+    stroke-width: 1;
+  }
+  .ramparea.off {
+    fill-opacity: 0.4;
+    stroke-dasharray: 3 2;
+  }
+  .rampseg {
+    fill: transparent;
+  }
+  .rampmove {
+    stroke: #fff;
+    stroke-opacity: 0.55;
+    stroke-width: 1;
+  }
+  .ramplabel {
+    fill: #a3e635;
+  }
+  .rampword {
+    color: var(--muted);
+  }
+  .rampword.out {
+    color: #a3e635;
+    font-weight: 700;
+  }
+  .rampword.moving {
+    color: var(--unsure);
+    font-weight: 700;
+  }
+  .rampword.off {
+    opacity: 0.75;
   }
   .band.near {
     fill: rgb(245 158 11 / 0.3);

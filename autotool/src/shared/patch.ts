@@ -369,6 +369,10 @@ export function featureSheet(f: AutoFeatures): Record<string, number> {
     put(`${p}.travel`, leg?.travelS, 1);
     put(`${p}.arrive`, (leg?.startS ?? 0) + (leg?.travelS ?? 0), 1);
     put(`${p}.leave`, leg?.endS, 1);
+    if (leg && (leg.during === "RAMP" || leg.ramp.maxOut > 0.02)) {
+      put(`${p}.rampOnArrival`, leg.ramp.atArrival * 100, 0); // percent out when the robot arrives
+      put(`${p}.rampOut`, leg.ramp.outAtS, 1); // when it is fully out (s)
+    }
     if (j.next) {
       put(`${p}.facingNext`, j.next.facingErrDeg, 0);
       put(`${p}.nextClusterDist`, j.next.nextClusterDistIn);
@@ -378,6 +382,7 @@ export function featureSheet(f: AutoFeatures): Record<string, number> {
   put("total.junctions", f.junctions.length, 0);
   put("total.time", f.timeline.nominalS, 1);
   put("total.worst", f.timeline.worstS, 1);
+  if (f.ramp.used) put("ramp.travel", f.ramp.travelS, 2);
   put("abortAt", f.timeline.abortAtS, 1);
   return out;
 }

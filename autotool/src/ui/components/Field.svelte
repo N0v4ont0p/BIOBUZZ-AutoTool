@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Conflict } from "../../shared/compare.ts";
   import type { AutoFeatures } from "../../shared/features.ts";
-  import { poseAtTime } from "../../shared/features.ts";
+  import { poseAtTime, rampOutAt, rampPolygon } from "../../shared/features.ts";
   import { DEG, footprint, toField as bodyToField } from "../../shared/geometry.ts";
   import type { RobotModel } from "../../shared/profile.ts";
   import type { SeasonPack } from "../../shared/season.ts";
@@ -29,6 +29,10 @@
   const robotAt = $derived(app.scrubT > 0 ? poseAtTime(features, app.scrubT) : null);
   const partnerAt = $derived(partner && app.scrubT > 0 ? poseAtTime(partner.features, app.scrubT - partner.delayS) : null);
   const pfp = (p: { x: number; y: number; headingDeg: number }) => pointsAttr(footprint(p, partner!.body), red);
+  // the ramp, as far out as it is at the scrubber time (AutoRunner's commands at the servo's travel time)
+  const rampNow = $derived(robotAt ? rampOutAt(features.ramp.moves, features.ramp.travelS, app.scrubT) : 0);
+  const partnerRampNow = $derived(partner && partnerAt ? rampOutAt(partner.features.ramp.moves, partner.features.ramp.travelS, app.scrubT - partner.delayS) : 0);
+  const rampPts = (p: { x: number; y: number; headingDeg: number }, out: number, m: RobotModel = model) => pointsAttr(rampPolygon(p, m, out), red);
   const marks = $derived(partner?.conflicts.filter((c) => c.kind === "collision" || c.kind === "nearMiss" || c.kind === "park" || (c.kind === "start" && c.gapIn !== Infinity)) ?? []);
 
   // drag state
@@ -284,6 +288,16 @@
     {@const p = sx(j.pose.x, j.pose.y, red)}
     <g class="stop" class:selected={app.selected === j.id}>
       <polygon points={fp(j.pose.x, j.pose.y, j.pose.headingDeg)} class="footprint" />
+      {#if leg.during === "RAMP"}
+        {@const lr = features.legs[j.index]?.ramp}
+        {#if lr}
+          <g class="rampstop" class:late={lr.late.length > 0 || lr.outAtS === null} class:off={!features.ramp.calibrated}>
+            <polygon points={rampPts(j.pose, 1)} class="rampreach" />
+            {#if lr.atArrival > 0.02}<polygon points={rampPts(j.pose, lr.atArrival)} class="rampfill" />{/if}
+            <title>ramp {Math.round(lr.atArrival * 100)}% out on arrival{lr.outAtS !== null ? `, fully out at ${lr.outAtS} s` : ", never fully out on this leg"}{lr.late.length ? `; reaches ${lr.late.join(", ")} before it is out` : ""}{features.ramp.calibrated ? "" : " (positions not in the robot code yet: the robot keeps it in)"}</title>
+          </g>
+        {/if}
+      {/if}
       <polyline points={arrowPts(j.pose.x, j.pose.y, j.pose.headingDeg, model.body.front)} class="heading" />
       {#if j.turnDeg !== null && Math.abs(j.turnDeg) >= model.sharpTurnDeg}
         <path d={turnArc(j.pose.x, j.pose.y, features.geometry[j.index].samples.at(-1)?.tangentDeg ?? 0, j.turnDeg, 5.5, red)} class="turnarc" marker-end="url(#arrow)"><title>sharp turn {j.turnDeg.toFixed(0)}°</title></path>
@@ -341,12 +355,14 @@
     </g>
   {/each}
   {#if partnerAt}
+    {#if partnerRampNow > 0.02}<polygon points={rampPts(partnerAt, partnerRampNow, { ...model, body: partner!.body })} class="rampghost partner" />{/if}
     <polygon points={pfp(partnerAt)} class="ghost partner" />
     <polyline points={arrowPts(partnerAt.x, partnerAt.y, partnerAt.headingDeg, partner!.body.front)} class="heading ghostarrow partner" />
   {/if}
 
   <!-- scrubber robot -->
   {#if robotAt}
+    {#if rampNow > 0.02}<polygon points={rampPts(robotAt, rampNow)} class="rampghost" class:moving={rampNow < 0.999} class:off={!features.ramp.calibrated}><title>ramp {rampNow >= 0.999 ? "out" : `${Math.round(rampNow * 100)}% out`}</title></polygon>{/if}
     <polygon points={fp(robotAt.x, robotAt.y, robotAt.headingDeg)} class="ghost" />
     <polyline points={arrowPts(robotAt.x, robotAt.y, robotAt.headingDeg, model.body.front)} class="heading ghostarrow" />
   {/if}
@@ -373,7 +389,7 @@
     outline: none;
   }
   /* only the leg hit lines and the handles take the pointer; everything drawn is click-through */
-  .field :global(:is(image, .cell, .element, .picked, .before, .leg, .intakeband, .chev, .dir, .leglabel, .note, .ctrlline, .ctrlnum, .stop, .footprint, .heading, .badge, .starttext, .knobline, .ghost, .ghostarrow, .lztext)) {
+  .field :global(:is(image, .cell, .element, .picked, .before, .leg, .intakeband, .chev, .dir, .leglabel, .note, .ctrlline, .ctrlnum, .stop, .footprint, .heading, .badge, .starttext, .knobline, .ghost, .ghostarrow, .rampghost, .lztext)) {
     pointer-events: none;
   }
   .cell circle {
@@ -665,6 +681,44 @@
   }
   .ghostarrow {
     stroke: var(--sel);
+  }
+  .rampghost {
+    fill: #a3e635;
+    fill-opacity: 0.75;
+    stroke: #ecfccb;
+    stroke-width: 0.35;
+  }
+  .rampghost.moving {
+    fill-opacity: 0.45;
+    stroke-dasharray: 0.8 0.6;
+  }
+  .rampghost.off {
+    fill: #8b8f97;
+  }
+  .rampghost.partner {
+    fill: var(--partner);
+    stroke: var(--partner);
+  }
+  .rampreach {
+    fill: none;
+    stroke: #a3e635;
+    stroke-width: 0.3;
+    stroke-dasharray: 0.8 0.6;
+    stroke-opacity: 0.9;
+  }
+  .rampfill {
+    fill: #a3e635;
+    fill-opacity: 0.6;
+    stroke: none;
+  }
+  .rampstop.late .rampreach {
+    stroke: var(--unsure);
+  }
+  .rampstop.late .rampfill {
+    fill: var(--unsure);
+  }
+  .rampstop.off .rampfill {
+    fill: #8b8f97;
   }
   .ghost.partner {
     fill: var(--partner);
