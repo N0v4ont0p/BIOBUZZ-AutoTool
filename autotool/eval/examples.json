@@ -2,7 +2,7 @@
  {
   "title": "a shot from the zone with the preload",
   "kind": "positive",
-  "features": "L1 (shot1): move.in=25.3in | turn=42deg | zone.in edge=5.9in | farCELL dist=35.9in turret=-30deg reachable | inventory.legStart=4 before=4  now: during=NONE end=NONE (not decided yet)",
+  "features": "L1 (shot1): move.in=25.3in | turn=42deg | zone.in edge=5.9in | farCELL dist=35.9in turret front=-30deg back=-30deg reachable | inventory.legStart=4 before=4  now: during=NONE end=NONE (not decided yet)",
   "answer": [
    {
     "junction": "L1",
@@ -10,47 +10,47 @@
      "move.in=25.3in",
      "turn=42deg",
      "zone.in edge=5.9in",
-     "farCELL dist=35.9in turret=-30deg reachable",
+     "farCELL dist=35.9in turret front=-30deg back=-30deg reachable",
      "inventory.legStart=4 before=4"
     ],
     "during": "NONE",
     "end": "SHOOT",
-    "reason": "In the zone, the turret reaches the CELL, holding the preload: end SHOOT."
+    "reason": "In the zone, both turrets reach the CELL, holding the preload: end SHOOT."
    }
   ]
  },
  {
-  "title": "looks like a shot, but the turret cannot reach the CELL",
+  "title": "looks like a shot, but neither turret can reach the CELL",
   "kind": "negative",
-  "features": "L1 (shot1): move.in=25.5in | turn=5deg | zone.out(CELL outside yaw travel (needs 159 deg)) | farCELL dist=38.3in turret=159deg UNREACHABLE | inventory.legStart=4 before=4  now: during=NONE end=NONE (not decided yet)",
+  "features": "L1 (shot1): move.in=25.5in | turn=5deg | zone.out(CELL outside both turrets' travel (front needs 159 deg, back 159 deg)) | farCELL dist=38.3in turret front=159deg back=159deg UNREACHABLE | inventory.legStart=4 before=4  now: during=NONE end=NONE (not decided yet)",
   "answer": [
    {
     "junction": "L1",
     "evidence": [
      "move.in=25.5in",
      "turn=5deg",
-     "zone.out(CELL outside yaw travel (needs 159 deg))",
-     "farCELL dist=38.3in turret=159deg UNREACHABLE",
+     "zone.out(CELL outside both turrets' travel (front needs 159 deg, back 159 deg))",
+     "farCELL dist=38.3in turret front=159deg back=159deg UNREACHABLE",
      "inventory.legStart=4 before=4"
     ],
     "during": "NONE",
     "end": "NONE",
-    "reason": "In the distance band but the CELL is outside yaw travel, so AutoRunner would skip the shot: end NONE, not SHOOT."
+    "reason": "In the distance band but the CELL is outside both turrets' travel, so AutoRunner would skip the shot: end NONE, not SHOOT."
    }
   ]
  },
  {
   "title": "the leg into the GARDEN runs over POLLEN",
   "kind": "positive",
-  "features": "L3 (gardenEnd3): move.in=28.5in | turn=-134deg | zone.out(CELL outside yaw travel (needs -135 deg); within 1 in of a wall) | farCELL dist=69.2in turret=-135deg UNREACHABLE | inventory.legStart=0 before=0 | sweeps=4  now: during=NONE end=NONE (not decided yet)",
+  "features": "L3 (gardenEnd3): move.in=28.5in | turn=-134deg | zone.out(CELL outside both turrets' travel (front needs -135 deg, back -135 deg); within 1 in of a wall) | farCELL dist=69.2in turret front=-135deg back=-135deg UNREACHABLE | inventory.legStart=0 before=0 | sweeps=4  now: during=NONE end=NONE (not decided yet)",
   "answer": [
    {
     "junction": "L3",
     "evidence": [
      "move.in=28.5in",
      "turn=-134deg",
-     "zone.out(CELL outside yaw travel (needs -135 deg); within 1 in of a wall)",
-     "farCELL dist=69.2in turret=-135deg UNREACHABLE",
+     "zone.out(CELL outside both turrets' travel (front needs -135 deg, back -135 deg); within 1 in of a wall)",
+     "farCELL dist=69.2in turret front=-135deg back=-135deg UNREACHABLE",
      "inventory.legStart=0 before=0",
      "sweeps=4"
     ],
@@ -63,14 +63,14 @@
  {
   "title": "the last stop is in the LOADING ZONE",
   "kind": "positive",
-  "features": "L2 (park, last): move.in=53in | zone.in edge=18.3in | audienceCELL dist=48.3in turret=-42deg reachable | inventory.legStart=0 before=0 | last park.in  now: during=NONE end=NONE (not decided yet)",
+  "features": "L2 (park, last): move.in=53in | zone.in edge=18.3in | audienceCELL dist=48.3in turret front=-42deg back=-42deg reachable | inventory.legStart=0 before=0 | last park.in  now: during=NONE end=NONE (not decided yet)",
   "answer": [
    {
     "junction": "L2",
     "evidence": [
      "move.in=53in",
      "zone.in edge=18.3in",
-     "audienceCELL dist=48.3in turret=-42deg reachable",
+     "audienceCELL dist=48.3in turret front=-42deg back=-42deg reachable",
      "inventory.legStart=0 before=0",
      "last park.in"
     ],
@@ -83,7 +83,7 @@
  {
   "title": "imported code that does not shoot where it could",
   "kind": "positive",
-  "features": "L1 (shot1): move.in=25.5in | turn=5deg | zone.in edge=8.3in | farCELL dist=38.3in turret=-21deg reachable | inventory.legStart=4 before=4 | code=NONE/NONE  now: during=NONE end=NONE (by imported)",
+  "features": "L1 (shot1): move.in=25.5in | turn=5deg | zone.in edge=8.3in | farCELL dist=38.3in turret front=-21deg back=-21deg reachable | inventory.legStart=4 before=4 | code=NONE/NONE  now: during=NONE end=NONE (by imported)",
   "answer": [
    {
     "junction": "L1",
@@ -91,7 +91,7 @@
      "move.in=25.5in",
      "turn=5deg",
      "zone.in edge=8.3in",
-     "farCELL dist=38.3in turret=-21deg reachable",
+     "farCELL dist=38.3in turret front=-21deg back=-21deg reachable",
      "inventory.legStart=4 before=4",
      "code=NONE/NONE"
     ],
@@ -105,7 +105,7 @@
  {
   "title": "in the zone but holding 0",
   "kind": "negative",
-  "features": "L1 (shot1): move.in=25.3in | turn=42deg | zone.in edge=5.9in | farCELL dist=35.9in turret=-30deg reachable | inventory.legStart=0 before=0  now: during=NONE end=NONE (not decided yet)",
+  "features": "L1 (shot1): move.in=25.3in | turn=42deg | zone.in edge=5.9in | farCELL dist=35.9in turret front=-30deg back=-30deg reachable | inventory.legStart=0 before=0  now: during=NONE end=NONE (not decided yet)",
   "answer": [
    {
     "junction": "L1",
@@ -113,7 +113,7 @@
      "move.in=25.3in",
      "turn=42deg",
      "zone.in edge=5.9in",
-     "farCELL dist=35.9in turret=-30deg reachable",
+     "farCELL dist=35.9in turret front=-30deg back=-30deg reachable",
      "inventory.legStart=0 before=0"
     ],
     "during": "NONE",

@@ -52,3 +52,24 @@ test("the intake mouth width and reach decide what an INTAKE leg picks up", () =
   assert.ok(picked(18) >= picked(2), "a narrower mouth never picks up more");
   assert.ok(picked(18) > 0);
 });
+
+test("team-config launcher geometry, the mixed load and the POLLEN feeder become facts", () => {
+  const cfg = `tuning_constants:
+  launcher_geometry:
+    frontLaunchDeg: {value: 59, origin: measured, source: "CAD v1", confirmed: true, units: deg above horizontal}
+    backLaunchDeg: {value: 59, origin: measured, source: "CAD v1", confirmed: true, units: deg above horizontal}
+    frontReleaseHeightIn: {value: 12.2, origin: measured, source: "CAD v1", confirmed: true, units: in}
+    backReleaseHeightIn: {value: null, origin: untuned, source: asked, confirmed: true, units: in}
+`;
+  const d = digestOf(cfg);
+  d.facts.push({ key: "mixedLoad", text: "at most 2 NECTAR + 2 POLLEN", file: "team-config.yaml", line: 74 }, { key: "intakeMotors", text: "intake_motor and pollen_feed_motor", file: "team-config.yaml", line: 107 });
+  const f = factsFromDigest(d, pack);
+  assert.deepEqual([f.frontLaunchDeg.value, f.frontLaunchDeg.status, f.frontReleaseHeightIn.value], [59, "measured", 12.2]);
+  assert.equal(f.backReleaseHeightIn.status, "assumed");
+  assert.match(f.backReleaseHeightIn.source, /backReleaseHeightIn is not filled in yet/);
+  assert.deepEqual([f.nectarMax.value, f.pollenWithNectar.value, f.nectarMax.status], [2, 2, "code"]);
+  assert.equal(f.intakeMotors.status, "code");
+  const m = robotModel(f);
+  assert.deepEqual([m.launch.front.deg, m.launch.front.releaseIn], [59, 12.2]);
+  assert.ok(Number.isNaN(m.launch.back.releaseIn));
+});

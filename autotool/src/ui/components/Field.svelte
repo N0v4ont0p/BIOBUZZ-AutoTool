@@ -29,9 +29,9 @@
   const robotAt = $derived(app.scrubT > 0 ? poseAtTime(features, app.scrubT) : null);
   const partnerAt = $derived(partner && app.scrubT > 0 ? poseAtTime(partner.features, app.scrubT - partner.delayS) : null);
   const pfp = (p: { x: number; y: number; headingDeg: number }) => pointsAttr(footprint(p, partner!.body), red);
-  // the ramp, as far out as it is at the scrubber time (AutoRunner's commands at the servo's travel time)
-  const rampNow = $derived(robotAt ? rampOutAt(features.ramp.moves, features.ramp.travelS, app.scrubT) : 0);
-  const partnerRampNow = $derived(partner && partnerAt ? rampOutAt(partner.features.ramp.moves, partner.features.ramp.travelS, app.scrubT - partner.delayS) : 0);
+  // the ramp, as far out as it is at the scrubber time (AutoRunner's commands at the measured out / in times)
+  const rampNow = $derived(robotAt ? rampOutAt(features.ramp.moves, features.ramp, app.scrubT) : 0);
+  const partnerRampNow = $derived(partner && partnerAt ? rampOutAt(partner.features.ramp.moves, partner.features.ramp, app.scrubT - partner.delayS) : 0);
   const rampPts = (p: { x: number; y: number; headingDeg: number }, out: number, m: RobotModel = model) => pointsAttr(rampPolygon(p, m, out), red);
   const marks = $derived(partner?.conflicts.filter((c) => c.kind === "collision" || c.kind === "nearMiss" || c.kind === "park" || (c.kind === "start" && c.gapIn !== Infinity)) ?? []);
 
@@ -294,7 +294,7 @@
           <g class="rampstop" class:late={lr.late.length > 0 || lr.outAtS === null} class:off={!features.ramp.calibrated}>
             <polygon points={rampPts(j.pose, 1)} class="rampreach" />
             {#if lr.atArrival > 0.02}<polygon points={rampPts(j.pose, lr.atArrival)} class="rampfill" />{/if}
-            <title>ramp {Math.round(lr.atArrival * 100)}% out on arrival{lr.outAtS !== null ? `, fully out at ${lr.outAtS} s` : ", never fully out on this leg"}{lr.late.length ? `; reaches ${lr.late.join(", ")} before it is out` : ""}{features.ramp.calibrated ? "" : " (positions not in the robot code yet: the robot keeps it in)"}</title>
+            <title>ramp {Math.round(lr.atArrival * 100)}% out on arrival{lr.outAtS !== null ? `, fully out at ${lr.outAtS} s` : ", never fully out on this leg"}{lr.late.length ? `; reaches ${lr.late.join(", ")} before it is out` : ""}{features.ramp.calibrated ? "" : " (ramp times not measured in the robot code yet: the robot keeps it stowed)"}</title>
           </g>
         {/if}
       {/if}
@@ -305,10 +305,13 @@
       {#if leg.junction.review}
         <circle cx={p.x} cy={p.y} r="2.4" class="unsurestop" /><text x={p.x} y={p.y + 0.1} class="unsuretext" text-anchor="middle" dominant-baseline="central">?</text>
       {:else if leg.end === "SHOOT"}
-        {@const pv = bodyToField({ x: j.pose.x, y: j.pose.y, headingDeg: j.pose.headingDeg }, model.backPivot.x, model.backPivot.y)}
-        {@const pp = sx(pv.x, pv.y, red)}
         {@const cp = sx(j.target.x, j.target.y, red)}
-        <line x1={pp.x} y1={pp.y} x2={cp.x} y2={cp.y} class="aim" class:bad={!j.target.reachable} />
+        <!-- each turret aims on its own: a dashed amber line is a turret that cannot reach (its gate stays shut) -->
+        {#each [[model.frontPivot, j.target.frontReachable, "front"], [model.backPivot, j.target.backReachable, "back"]] as const as [pivot, ok, side]}
+          {@const pv = bodyToField({ x: j.pose.x, y: j.pose.y, headingDeg: j.pose.headingDeg }, pivot.x, pivot.y)}
+          {@const pp = sx(pv.x, pv.y, red)}
+          <line x1={pp.x} y1={pp.y} x2={cp.x} y2={cp.y} class="aim" class:bad={!ok}><title>{side} turret {Math.round(side === "front" ? j.target.frontYawDeg : j.target.backYawDeg)}°{ok ? "" : ": cannot reach, does not fire"}</title></line>
+        {/each}
         <circle cx={p.x} cy={p.y} r="5.2" class="zonering" class:out={!j.zone.in} />
         <circle cx={p.x} cy={p.y} r="3" class="target" /><circle cx={p.x} cy={p.y} r="1.6" class="target" /><circle cx={p.x} cy={p.y} r="0.5" class="targetdot" />
         <text x={p.x + 3.6} y={p.y - 3.2} class="fired">−{j.inventory.fired}</text>

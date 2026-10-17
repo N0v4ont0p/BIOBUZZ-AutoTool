@@ -55,26 +55,13 @@ export function factsFromDigest(d: Digest, pack: SeasonPack): Record<string, Fac
   else if (d.constants[`${AR}.ABORT_AT_S`]) set("rampCarryS", { value: 0, status: "code", source: `${d.constants[`${AR}.ABORT_AT_S`].file}: AutoRunner has no RAMP_CARRY_S, so it folds the ramp when the next leg starts` });
   for (const k of ["centerToFront", "centerToBack", "centerToLeft", "centerToRight"]) set(k, fromConstant(d, `Tuned.${k}`, "CAD sheet C-2"), `the start cube is ${pack.rules.startConfig.cubeIn} in (R102)`);
   for (const k of ["frontPivotX", "frontPivotY", "backPivotX", "backPivotY"]) set(k, fromConstant(d, `Tuned.${k}`, "CAD sheet C-3"), "aim from the robot centre");
-  set("yawMinDeg", fromConstant(d, "Tuned.yawMinDeg", "Yaw Tuner G-1 part A"), "CAD sheet C-6 asks for stops past 90 deg");
-  set("yawMaxDeg", fromConstant(d, "Tuned.yawMaxDeg", "Yaw Tuner G-1 part A"), "CAD sheet C-6 asks for stops past 90 deg");
-  set("gateTravelS", fromConstant(d, "Tuned.gateTravelS", "E-8"));
-  set("rampTravelS", fromConstant(d, "Tuned.rampTravelS", "program 4, slow motion"));
-  const rs = d.constants["Tuned.rampStowed"];
-  const rd = d.constants["Tuned.rampDeployed"];
-  if (rs && rd) {
-    const both = rs.value !== null && rd.value !== null;
-    set("rampPositions", {
-      value: both ? "set" : "not set",
-      status: "code",
-      source: both ? `${rs.file}:${rs.line} rampStowed = ${rs.expr}, rampDeployed = ${rd.expr}` : `${rs.file}:${rs.line} rampStowed / rampDeployed are NaN (program 4): AutoRunner never moves the ramp until they are set`,
-    });
-  }
-  const tf = d.constants["Tuned.yawTicksPerDegFront"];
-  const tb = d.constants["Tuned.yawTicksPerDegBack"];
-  if (tf && tb) {
-    if (tf.value !== null && tb.value !== null && tb.value !== 0) set("yawBackPerFront", { value: tf.value / tb.value, status: "measured", source: `${tf.file}:${tf.line} yawTicksPerDegFront / yawTicksPerDegBack` });
-    else set("yawBackPerFront", { value: NaN, status: "assumed", source: `${tf.file}:${tf.line} yaw ticks per degree are NaN (G-1)` }, "both turrets turn the same amount");
-  }
+  // one yaw servo per turret, each with its own soft limits (program 3)
+  for (const k of ["frontYawMinDeg", "frontYawMaxDeg", "backYawMinDeg", "backYawMaxDeg"]) set(k, fromConstant(d, `Tuned.${k}`, "program 3"));
+  set("yawDegPerS", fromConstant(d, "Tuned.yawDegPerS", "program 3, the slower turret"));
+  set("gateTravelS", fromConstant(d, "Tuned.gateTravelS", "E-8, the slowest gate servo"));
+  set("rampOutS", fromConstant(d, "Tuned.rampOutS", "program 4, slow motion"));
+  set("rampInS", fromConstant(d, "Tuned.rampInS", "program 4, slow motion"));
+  set("rampHoldPower", fromConstant(d, "Tuned.rampHoldPower", "program 4"));
   for (const [side, keyMin, keyMax] of [["back", "shotMinIn", "shotMaxIn"]] as const) {
     const t = d.shotTables[side];
     if (t.min !== null && t.max !== null) {
@@ -107,6 +94,10 @@ export function factsFromDigest(d: Digest, pack: SeasonPack): Record<string, Fac
     ["decel", "driveDecelInS2", "test drive: braking at the end of a path"],
     ["latAccel", "driveLatAccelInS2", "test drive: sideways acceleration in a curve"],
     ["maxTurnDegS", "driveMaxTurnDegS", "test drive: fastest heading change"],
+    ["frontLaunchDeg", "frontLaunchDeg", "CAD: fixed launch angle above horizontal"],
+    ["backLaunchDeg", "backLaunchDeg", "CAD: fixed launch angle above horizontal"],
+    ["frontReleaseHeightIn", "frontReleaseHeightIn", "CAD: element centre at release"],
+    ["backReleaseHeightIn", "backReleaseHeightIn", "CAD: element centre at release"],
   ];
   for (const [fact, key, how] of yamlFacts) {
     const c = d.constants[`Config.${key}`];
@@ -120,6 +111,12 @@ export function factsFromDigest(d: Digest, pack: SeasonPack): Record<string, Fac
     if (f.key === "intakeEnd") set("intakeEnd", { value: "front", status: "code", source: `${f.file}:${f.line} ${f.text}` });
     if (f.key === "parkRegion") set("parkRegion", { value: "LOADING ZONE", status: "code", source: `${f.file}:${f.line} ${f.text}; 10.5.4` });
     if (f.key === "capacity") set("capacity", { value: 4, status: "rule", source: `G407; ${f.file}:${f.line} ${f.text}` });
+    if (f.key === "intakeMotors") set("intakeMotors", { value: 2, status: "code", source: `${f.file}:${f.line} ${f.text}` });
+    const mix = f.key === "mixedLoad" ? /(\d+) NECTAR \+ (\d+) POLLEN/.exec(f.text) : null;
+    if (mix) {
+      set("nectarMax", { value: Number(mix[1]), status: "code", source: `${f.file}:${f.line} ${f.text}` });
+      set("pollenWithNectar", { value: Number(mix[2]), status: "code", source: `${f.file}:${f.line} ${f.text}` });
+    }
   }
   return facts;
 }

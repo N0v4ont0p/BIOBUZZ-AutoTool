@@ -67,10 +67,10 @@
       const fold = features.ramp.moves.find((m) => m.legId === leg.id && !m.out);
       return { text: fold ? `${pct(r.atStart)} out when this leg starts; folds at ${fold.t.toFixed(2)} s (${(fold.t - lf.startS).toFixed(2)} s into the leg: ${fold.why})` : `${pct(r.atStart)} out when this leg starts`, bad: false, needWaitS: null };
     }
-    const swing = features.ramp.travelS;
-    const head = `comes out at the leg start (${swing} s swing): ${pct(r.atArrival)} out on arrival`;
+    const outS = features.ramp.outS;
+    const head = `comes out at the leg start (${outS} s out, ${features.ramp.inS} s in): ${pct(r.atArrival)} out on arrival`;
     if (r.late.length || r.outAtS === null) {
-      const need = Math.ceil((1 - r.atArrival) * swing * 10) / 10;
+      const need = Math.ceil((1 - r.atArrival) * outS * 10) / 10;
       const canWait = leg.end === "NONE" || leg.end === "WAIT";
       return {
         text: `${head}, ${r.outAtS === null ? "never fully out on this leg" : `fully out at ${r.outAtS} s`}${r.late.length ? `; reaches ${r.late.join(", ")} before it is out` : ""}${canWait ? "" : " (the intake is off during the shot: end it with a WAIT instead)"}`,
@@ -307,7 +307,7 @@
             {@const rl = rampLine(leg, lf)}
             {#if rl}
               <div class="f"><span class="k">Ramp</span>
-                <span class:rampbad={rl.bad}>{rl.text}{#if !features.ramp.calibrated}<span class="muted"> · positions not in the robot code yet: the robot keeps it in</span>{/if}
+                <span class:rampbad={rl.bad}>{rl.text}{#if !features.ramp.calibrated}<span class="muted"> · ramp times not measured in the robot code yet: the robot keeps it stowed</span>{/if}
                   {#if rl.needWaitS !== null}<button class="fixramp" onclick={() => waitForRamp(leg, rl.needWaitS!)} title="End this leg with a WAIT long enough for the ramp to be fully out">Wait {rl.needWaitS} s for it</button>{/if}
                 </span>
               </div>

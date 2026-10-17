@@ -359,7 +359,8 @@ export function featureSheet(f: AutoFeatures): Record<string, number> {
     put(`${p}.turn`, j.turnDeg, 0);
     put(`${p}.dist`, j.target.backDistIn);
     put(`${p}.frontDist`, j.target.frontDistIn);
-    put(`${p}.turret`, j.target.turretCmdDeg, 0);
+    put(`${p}.frontTurret`, j.target.frontYawDeg, 0);
+    put(`${p}.backTurret`, j.target.backYawDeg, 0);
     put(`${p}.turretMargin`, j.target.turretMarginDeg, 0);
     put(`${p}.zoneEdge`, j.zone.edgeIn);
     put(`${p}.heldAtLegStart`, j.inventory.atLegStart, 0);
@@ -386,7 +387,10 @@ export function featureSheet(f: AutoFeatures): Record<string, number> {
   put("total.junctions", f.junctions.length, 0);
   put("total.time", f.timeline.nominalS, 1);
   put("total.worst", f.timeline.worstS, 1);
-  if (f.ramp.used) put("ramp.travel", f.ramp.travelS, 2);
+  if (f.ramp.used) {
+    put("ramp.out", f.ramp.outS, 2);
+    put("ramp.in", f.ramp.inS, 2);
+  }
   put("abortAt", f.timeline.abortAtS, 1);
   return out;
 }

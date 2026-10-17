@@ -77,7 +77,7 @@ export function routeWords(pack: SeasonPack, f: AutoFeatures): string {
     if (j.wallClearanceIn < 2) where.push("against a wall");
     if (j.onCluster) where.push("on staged elements");
     out.push(
-      `${j.id} -> ${j.pose.name} (${j.pose.x}, ${j.pose.y}) heading ${j.pose.headingDeg}: ${where.join(", ")}; faces ${headingWords(j.pose.headingDeg)}; aims at the ${j.target.cell} CELL, bearing ${Math.round(j.target.bearingDeg)} deg, turret ${j.target.reachable ? "reaches" : "CANNOT reach"} it; ${j.zone.in ? "in the shooting zone" : `out of the shooting zone (${j.zone.reasons.join("; ")})`}.`,
+      `${j.id} -> ${j.pose.name} (${j.pose.x}, ${j.pose.y}) heading ${j.pose.headingDeg}: ${where.join(", ")}; faces ${headingWords(j.pose.headingDeg)}; aims at the ${j.target.cell} CELL, bearing ${Math.round(j.target.bearingDeg)} deg, ${{ both: "both turrets reach it", front: "only the front turret reaches it (fires front only)", back: "only the back turret reaches it (fires back only)", none: "neither turret CAN reach it" }[j.target.fires]}; ${j.zone.in ? "in the shooting zone" : `out of the shooting zone (${j.zone.reasons.join("; ")})`}.`,
     );
   }
   return out.join("\n");

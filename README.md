@@ -84,11 +84,12 @@ Settings until the robot repo's `team-config.yaml` has them.
   closes it. **Persistent intake** runs the intake all auto except during shots.
 - **Ramp**: the ramp is shown the way `AutoRunner` moves it: out at the start of a RAMP leg; after it, it stays out
   the leg's ramp carry (`carryRamp`, default `RAMP_CARRY_S` 0.5 s) into the next leg so the robot backs out of the
-  FLOWER before it folds; a shot on any other leg, PARK, the end and the abort time fold it at once; it swings at the ramp travel time
-  that setup program 4 measures from slow motion (assumed 0.55 s until then). The time bar has a ramp lane (height
+  FLOWER before it folds; a shot on any other leg, PARK, the end and the abort time fold it at once. Two continuous servos
+  pull it by strings for a time: it comes out in `rampOutS` and folds in `rampInS`, which setup program 4 measures from
+  slow motion (assumed 0.55 s each until then); a command midway turns it back from where it is. The time bar has a ramp lane (height
   = how far out), the playback robot and every RAMP stop show it, and a FLOWER stack only counts once the ramp is
   fully out. Warnings say when a RAMP leg arrives before the ramp is out (one click adds the WAIT it needs), when it
-  never gets out, when it reaches into a wall, when the robot code has no ramp positions yet (the robot then never
+  never gets out, when it reaches into a wall, when the robot code has no ramp times yet (the robot then never
   moves it) and when the ramp makes the robot longer than 18 x 24 in (R105). Partner collision checks include it.
 - **AUTO points**: the top of the Legs list counts the auto the way Table 10-2 does (LEAVE 3, PARK 5,
   HIVE TIP 20 when POLLEN reach the upward-facing CELL) and shows what each leg adds.

@@ -72,7 +72,7 @@
   }
   const at = $derived(poseAtTime(features, app.scrubT));
   const held = $derived(heldAt(features, app.scrubT));
-  const rampNow = $derived(rampLane ? rampOutAt(features.ramp.moves, features.ramp.travelS, app.scrubT) : 0);
+  const rampNow = $derived(rampLane ? rampOutAt(features.ramp.moves, features.ramp, app.scrubT) : 0);
   const rampWord = $derived.by(() => {
     if (!rampLane) return "";
     const seg = features.ramp.segments.find((s) => app.scrubT >= s.fromS - 1e-9 && app.scrubT < s.toS - 1e-9);
@@ -93,7 +93,7 @@
   });
   const segTitle = (s: (typeof features.ramp.segments)[number]) =>
     `ramp ${s.state} ${s.fromS.toFixed(2)}–${s.toS.toFixed(2)} s${s.state === "deploying" || s.state === "stowing" ? ` (${Math.round(s.fromOut * 100)}% → ${Math.round(s.toOut * 100)}%)` : ""}`;
-  const rampFact = $derived(app.server?.profile?.facts?.rampTravelS);
+  const rampGuessed = $derived(["rampOutS", "rampInS"].some((k) => app.server?.profile?.facts?.[k]?.status === "assumed"));
   const fill: Record<string, string> = { drive: "#8b8f97", intake: "var(--intake)", ramp: "#a3e635", reposition: "var(--repo)", unsure: "var(--unsure)" };
 </script>
 
@@ -101,7 +101,7 @@
   <div class="readout" aria-live="polite">
     <button class="play" onclick={play} aria-label={app.playing ? "Pause" : "Play"} title={partner ? "Play both robots together" : "Play the auto"}>{app.playing ? "❚❚" : "▶"}</button>
     <strong>t = {app.scrubT.toFixed(1)} s</strong>
-    {#if at}<span>{at.legId ?? "done"} · {at.phase === "action" ? "at the stop" : at.phase === "travel" ? "driving" : "finished"} · holding {held}{#if rampLane}{" · "}<span class="rampword" class:out={rampNow >= 0.999} class:moving={rampNow > 0.001 && rampNow < 0.999} class:off={!features.ramp.calibrated} title={features.ramp.calibrated ? "" : "the ramp positions are not in the robot code yet: the robot keeps it folded in"}>ramp {rampWord}{features.ramp.calibrated ? "" : " (not set in the code)"}</span>{/if}</span>{/if}
+    {#if at}<span>{at.legId ?? "done"} · {at.phase === "action" ? "at the stop" : at.phase === "travel" ? "driving" : "finished"} · holding {held}{#if rampLane}{" · "}<span class="rampword" class:out={rampNow >= 0.999} class:moving={rampNow > 0.001 && rampNow < 0.999} class:off={!features.ramp.calibrated} title={features.ramp.calibrated ? "" : "the ramp times are not measured in the robot code yet: the robot keeps it stowed"}>ramp {rampWord}{features.ramp.calibrated ? "" : " (times not measured)"}</span>{/if}</span>{/if}
     <span class="tot" class:over={features.timeline.nominalS > features.timeline.autoS}>total {features.timeline.nominalS.toFixed(1)} s · worst {features.timeline.worstS.toFixed(1)} s</span>
     {#if guessed}<span class="guess" title="Measured by program 5 (top speed) once the robot is tuned; until then the drive times are a safe guess">drive times assume {guessed}</span>{/if}
   </div>
@@ -134,7 +134,7 @@
         <rect x={x0} y="12" width={Math.max(0.5, x1 - x0)} height="18" fill={fill[look]} class="seg" />
         {#if look === "reposition" || look === "unsure"}<rect x={x0} y="12" width={Math.max(0.5, x1 - x0)} height="18" fill="url(#tbhatch)" />{/if}
         {#if l.endActionS > 0}
-          <rect x={x1} y="12" width={Math.max(0.5, x2 - x1)} height="18" fill="var(--shoot)" class="seg" />
+          <rect x={x1} y="12" width={Math.max(0.5, x2 - x1)} height="18" fill="var(--shoot)" class="seg"><title>{l.id} {l.end} {l.endActionS.toFixed(2)} s{l.endActionText ? `: ${l.endActionText}` : ""}</title></rect>
           <rect x={x1} y="12" width={Math.max(0.5, x2 - x1)} height="18" fill="url(#tbhatch)" />
         {/if}
         {#if x2 - x0 > 34}<text x={(x0 + x2) / 2} y="24.5" text-anchor="middle" class="segtext">{l.id}</text>{/if}
@@ -142,7 +142,7 @@
       </g>
     {/each}
     {#if rampLane}
-      <!-- the ramp: height = how far out (AutoRunner's commands at the servo's travel time) -->
+      <!-- the ramp: height = how far out (AutoRunner's commands at the measured out / in times) -->
       <rect x={L} y={RY} width={W - 20 - L - R} height={RH} class="ramptrack" />
       <polygon points={rampArea} class="ramparea" class:off={!features.ramp.calibrated} />
       {#each features.ramp.segments as s}
@@ -151,7 +151,7 @@
       {#each features.ramp.moves as m}
         <line x1={X(Math.min(span, m.t))} y1={RY - 1} x2={X(Math.min(span, m.t))} y2={RY + RH + 1} class="rampmove"><title>{m.t.toFixed(2)} s: {m.out ? "out" : "in"} ({m.why})</title></line>
       {/each}
-      <text x="2" y={RY + RH - 0.5} class="plabel ramplabel">R<title>Ramp: {features.ramp.calibrated ? "" : "positions not set in the robot code yet (program 4), so the robot keeps it folded in; "}swing {features.ramp.travelS} s{rampFact?.status === "assumed" ? " (assumed until program 4 times it)" : ""}</title></text>
+      <text x="2" y={RY + RH - 0.5} class="plabel ramplabel">R<title>Ramp: {features.ramp.calibrated ? "" : "times not measured in the robot code yet (program 4), so the robot keeps it stowed; "}out {features.ramp.outS} s, in {features.ramp.inS} s{rampGuessed ? " (assumed until program 4 times it)" : ""}</title></text>
     {/if}
     <!-- worst case -->
     <line x1={X(Math.min(span, features.timeline.worstS))} y1="8" x2={X(Math.min(span, features.timeline.worstS))} y2="34" class="worst" />

@@ -92,6 +92,10 @@ export const YAML_KEYS = [
   "driveDecelInS2",
   "driveLatAccelInS2",
   "driveMaxTurnDegS",
+  "frontLaunchDeg",
+  "backLaunchDeg",
+  "frontReleaseHeightIn",
+  "backReleaseHeightIn",
 ];
 
 export function yamlConstants(cfg: string, file = "team-config.yaml"): Constant[] {
@@ -142,7 +146,7 @@ export function buildDigest(repo: RobotRepo, store: Store, progress?: (msg: stri
     const rows: number[] = [];
     for (let n = 1; n <= 16; n++) {
       const k = (c: string) => symbols[`Tuned.${side}Shot${String(n).padStart(2, "0")}${c}`];
-      const vals = ["Distance", "Speed", "Hood", "Feed"].map(k);
+      const vals = ["Distance", "Speed", "Feed"].map(k);
       if (vals.every((v) => typeof v === "number")) rows.push(vals[0] as number);
     }
     return {
@@ -160,6 +164,10 @@ export function buildDigest(repo: RobotRepo, store: Store, progress?: (msg: stri
     if (l) facts.push({ key: "intakeEnd", text: "front = intake / NECTAR launcher side", file: "team-config.yaml", line: l });
     const p = findLine(cfg, /endgame_parking:/);
     if (p) facts.push({ key: "parkRegion", text: "endgame_parking: loading_zone", file: "team-config.yaml", line: p });
+    const mix = /at most (\d+) NECTAR \+ (\d+) POLLEN/.exec(cfg);
+    if (mix) facts.push({ key: "mixedLoad", text: mix[0], file: "team-config.yaml", line: lineAt(cfg, mix.index) });
+    const feeder = findLine(cfg, /pollen_feed_motor:/);
+    if (feeder) facts.push({ key: "intakeMotors", text: "intake_motor (main intake + NECTAR feed) and pollen_feed_motor (2 POLLEN feeder wheels)", file: "team-config.yaml", line: feeder });
   }
   const docs = texts.get("docs/BIOBUZZ_PREREQUISITES.md");
   if (docs) {

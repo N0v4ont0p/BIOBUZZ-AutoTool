@@ -60,7 +60,7 @@ export function footprintGap(a: Vec[], b: Vec[]): number {
 
 // A robot's outline at time t: its frame, plus its ramp while the ramp is (partly) out.
 function shapesAt(f: AutoFeatures, m: RobotModel, pose: { x: number; y: number; headingDeg: number }, t: number): Vec[][] {
-  const out = f.ramp.moves.length ? rampOutAt(f.ramp.moves, f.ramp.travelS, t) : 0;
+  const out = f.ramp.moves.length ? rampOutAt(f.ramp.moves, f.ramp, t) : 0;
   return out > 0.02 ? [footprint(pose, m.body), rampPolygon(pose, m, out)] : [footprint(pose, m.body)];
 }
 

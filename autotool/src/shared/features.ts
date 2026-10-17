@@ -3,14 +3,15 @@
 // Behaviour follows the robot repo's opmodes/AutoRunner.java (read at milestone 3):
 //  - each leg is its own Pedro path, so the robot starts and ends every leg at rest;
 //  - INTAKE legs run the intake for the whole leg and carryIntake seconds into the next;
-//  - SHOOT holds, waits for stillness + aim lock + both flywheels (settle SETTLE_S), opens the gates
-//    and feeds FEED_S; if the CELL is outside the yaw travel it gives up after the shot timeout (SHOT_TIMEOUT_S) and
-//    skips the shot (nothing is fired);
+//  - SHOOT holds, waits for stillness + aim lock + the flywheels (settle SETTLE_S), opens the gates and feeds
+//    FEED_S. Each turret has its own servo and aims on its own; a launcher whose turret cannot reach the CELL keeps
+//    its gate shut and the other fires (front = NECTAR, back = POLLEN). With neither in reach it gives up after the
+//    shot timeout (SHOT_TIMEOUT_S) and skips the shot (nothing is fired);
 //  - PARK holds and ends the auto; past ABORT_AT_S no further leg runs.
 //  - the ramp (nextLeg / runLeg / finish): out at the start of a RAMP leg; after a RAMP leg it folds the leg's
 //    carryRamp time (RAMP_CARRY_S) into the next leg, unless that leg is a RAMP leg too; a SHOOT on any other leg
-//    folds it at the path end; PARK, the last leg done and ABORT_AT_S fold it at once. Only once
-//    Tuned.rampStowed / rampDeployed are set (otherwise it never moves).
+//    folds it at the path end; PARK, the last leg done and ABORT_AT_S fold it at once. Two continuous servos pull
+//    it by strings for a time: rampOutS stowed to out, rampInS back. Only once both are set (otherwise it never moves).
 
 import {
   type HeadingRule,
@@ -73,6 +74,7 @@ export interface LegFeatures {
   timesOut: boolean;
   endActionS: number; // nominal time of the end action
   endActionWorstS: number;
+  endActionText: string; // how the end action time adds up, in words
   startS: number;
   endS: number; // start of the next leg (nominal)
   cut: "none" | "partial" | "never"; // by ABORT_AT_S
@@ -103,7 +105,7 @@ export interface LegRamp {
   hits: string[]; // field elements other than FLOWERS the ramp tip touches while out
 }
 
-// A command AutoRunner gives the ramp servo, and the ramp's state over the auto.
+// A command AutoRunner gives the ramp servos, and the ramp's state over the auto.
 export interface RampMove {
   t: number;
   out: boolean;
@@ -119,8 +121,9 @@ export interface RampSegment {
 }
 export interface RampFeatures {
   used: boolean; // some leg is a RAMP leg
-  calibrated: boolean; // the robot code has both ramp positions: without them the robot never moves it
-  travelS: number;
+  calibrated: boolean; // the robot code has both ramp times: without them the robot never moves it
+  outS: number;
+  inS: number;
   reachIn: number;
   widthIn: number;
   end: "front" | "back";
@@ -129,53 +132,59 @@ export interface RampFeatures {
   expanded: { lengthIn: number; widthIn: number; limitIn: [number, number]; ok: boolean } | null;
 }
 
-// Fully out: the servo is at the deployed stop (AutoTool's travel model ends exactly there).
+// Fully out: the strings have run the whole rampOutS (AutoTool's travel model ends exactly there).
 const RAMP_OUT = 1 - 1e-6;
+type RampTimes = { outS: number; inS: number };
+const rampRate = (r: RampTimes, out: boolean) => {
+  const s = out ? r.outS : r.inS;
+  return s > 0 ? 1 / s : Infinity;
+};
 
 function stepToward(from: number, to: number, by: number): number {
   return to > from ? Math.min(to, from + by) : Math.max(to, from - by);
 }
 
-// How far out the ramp is at `t` (0..1): it swings at a constant rate, rampTravelS from end to end, and a new
-// command turns it from wherever it is. It starts folded in (stowed by hand before the match, R102).
-export function rampOutAt(moves: RampMove[], travelS: number, t: number): number {
-  const rate = travelS > 0 ? 1 / travelS : Infinity;
+// How far out the ramp is at `t` (0..1), as Ramp estimates it: out at 1/rampOutS a second, in at 1/rampInS, and a
+// new command turns it from wherever it is. It starts stowed (by hand before the match, R102).
+export function rampOutAt(moves: RampMove[], r: RampTimes, t: number): number {
   let at = 0;
   let pos = 0;
   let target = 0;
   for (const m of moves) {
     if (m.t > t) break;
-    pos = stepToward(pos, target, (m.t - at) * rate);
+    pos = stepToward(pos, target, (m.t - at) * rampRate(r, target === 1));
     at = m.t;
     target = m.out ? 1 : 0;
   }
-  return stepToward(pos, target, (t - at) * rate);
+  return stepToward(pos, target, (t - at) * rampRate(r, target === 1));
 }
 
+const rampTakes = (r: RampTimes, from: number, target: number) => Math.abs(target - from) * (target ? r.outS : r.inS);
+
 // When the ramp reaches `target` (0 or 1) after `from`, if no later command turns it first; null if it does not.
-function rampReachesAt(moves: RampMove[], travelS: number, from: number, target: 0 | 1): number | null {
-  const pos = rampOutAt(moves, travelS, from);
+function rampReachesAt(moves: RampMove[], r: RampTimes, from: number, target: 0 | 1): number | null {
+  const pos = rampOutAt(moves, r, from);
   if (Math.abs(pos - target) < 1e-9) return from;
   const last = [...moves].reverse().find((m) => m.t <= from + 1e-9);
   if (!last || (last.out ? 1 : 0) !== target) return null;
-  const at = from + Math.abs(target - pos) * travelS;
+  const at = from + rampTakes(r, pos, target);
   return moves.some((m) => m.t > from + 1e-9 && m.t < at - 1e-9) ? null : at;
 }
 
-function rampSegments(moves: RampMove[], travelS: number, endS: number): RampSegment[] {
+function rampSegments(moves: RampMove[], r: RampTimes, endS: number): RampSegment[] {
   const out: RampSegment[] = [];
   const times = [0, ...moves.map((m) => m.t).filter((t) => t > 0 && t < endS), endS];
   for (let i = 0; i + 1 < times.length; i++) {
     let a = times[i];
     const b = times[i + 1];
     if (b - a < 1e-9) continue;
-    const pa = rampOutAt(moves, travelS, a);
+    const pa = rampOutAt(moves, r, a);
     const last = [...moves].reverse().find((m) => m.t <= a + 1e-9);
     const target = last?.out ? 1 : 0;
     if (Math.abs(pa - target) > 1e-9) {
       // moving: until it gets there or the next command
-      const arrive = Math.min(b, a + Math.abs(target - pa) * travelS);
-      out.push({ fromS: a, toS: arrive, fromOut: pa, toOut: rampOutAt(moves, travelS, arrive), state: target ? "deploying" : "stowing" });
+      const arrive = Math.min(b, a + rampTakes(r, pa, target));
+      out.push({ fromS: a, toS: arrive, fromOut: pa, toOut: rampOutAt(moves, r, arrive), state: target ? "deploying" : "stowing" });
       a = arrive;
     }
     if (b - a > 1e-9) out.push({ fromS: a, toS: b, fromOut: target, toOut: target, state: target ? "out" : "in" });
@@ -191,7 +200,7 @@ function rampSegments(moves: RampMove[], travelS: number, endS: number): RampSeg
 }
 
 // The ramp in the field at `out` (0..1): a strip in front of the intake edge, as wide as the intake mouth,
-// reaching `out` of its deployed reach. (A swinging ramp reaches less than this mid-swing: never more.)
+// reaching `out` of its deployed reach. (A ramp on its way out reaches less than this: never more.)
 export function rampPolygon(pose: { x: number; y: number; headingDeg: number }, m: RobotModel, out: number): Vec[] {
   const s = m.intakeEnd === "front" ? 1 : -1;
   const edge = m.intakeEnd === "front" ? m.body.front : m.body.back;
@@ -221,17 +230,21 @@ export interface JunctionFeatures {
     frontDistIn: number;
     backDistIn: number;
     bearingDeg: number; // field bearing from robot centre to the CELL
-    turretCmdDeg: number; // shared yaw command (front-turret degrees), midway like AutoAim
-    reachable: boolean;
-    turretMarginDeg: number; // to the nearest yaw limit, negative = outside
+    frontYawDeg: number; // each turret's own angle to the CELL from its own pivot (AutoAim, no trims)
+    backYawDeg: number;
+    frontReachable: boolean;
+    backReachable: boolean;
+    reachable: boolean; // at least one turret reaches: AutoAim has a solution and that launcher fires
+    fires: "both" | "front" | "back" | "none"; // the launchers whose gate opens on a shot here
+    turretMarginDeg: number; // the better turret's margin to its nearest limit, negative = neither reaches
   };
   zone: { in: boolean; edgeIn: number; reasons: string[] };
   // atLegStart = held when the leg into this junction began; before = on arrival; after = after the end action
-  inventory: { atLegStart: number; before: number; after: number; picked: number; fired: number; beforeConfirmed: boolean };
+  inventory: { atLegStart: number; before: number; nectarBefore: number; after: number; picked: number; fired: number; beforeConfirmed: boolean };
   flags: string[];
   shotSkipped: boolean;
   // what this stop's shot launched, and whether it can score: in the shooting zone, turret in reach
-  shot: { pollen: number; nectar: number; inZone: boolean; atS: number } | null;
+  shot: { pollen: number; nectar: number; inZone: boolean; atS: number; turretS: number; fires: "both" | "front" | "back" } | null;
   holds: boolean; // SHOOT / PARK hold the robot here
   wallClearanceIn: number;
   inLoadingZone: boolean;
@@ -435,33 +448,62 @@ export function targetCell(model: RobotModel, robotY: number): { cell: "far" | "
   return { cell: far ? "far" : "audience", x: FIELD - src.x, y: FIELD - src.y };
 }
 
-// The aim math of subsystems/AutoAim.solve, for a stopped robot (no lead, no trims).
-export function solveAim(pose: { x: number; y: number; headingDeg: number }, model: RobotModel) {
+// The aim math of subsystems/AutoAim.solve, for a stopped robot (no lead, no trims): each turret from its own
+// pivot, against its own limits.
+export function solveAim(pose: { x: number; y: number; headingDeg: number }, model: RobotModel): JunctionFeatures["target"] {
   const t = targetCell(model, pose.y);
   const fp = toField(pose, model.frontPivot.x, model.frontPivot.y);
   const bp = toField(pose, model.backPivot.x, model.backPivot.y);
-  const frontDist = dist(fp, t);
-  const backDist = dist(bp, t);
-  const frontYaw = wrapDeg(Math.atan2(t.y - fp.y, t.x - fp.x) / DEG - pose.headingDeg);
-  // AutoAim: the back angle (back degrees) nearest to where the gearing puts it for the front angle,
-  // then converted to front degrees; the shared yaw goes midway between the two
-  let backYaw = wrapDeg(Math.atan2(t.y - bp.y, t.x - bp.x) / DEG - pose.headingDeg);
-  const ref = frontYaw * model.yawBackPerFront;
-  while (backYaw - ref > 180) backYaw -= 360;
-  while (backYaw - ref < -180) backYaw += 360;
-  const cmd = (frontYaw + backYaw / model.yawBackPerFront) / 2;
-  const margin = Math.min(cmd - model.yawMinDeg, model.yawMaxDeg - cmd);
+  const yawTo = (p: Vec) => wrapDeg(Math.atan2(t.y - p.y, t.x - p.x) / DEG - pose.headingDeg);
+  const margin = (deg: number, l: { minDeg: number; maxDeg: number }) => Math.min(deg - l.minDeg, l.maxDeg - deg);
+  const frontYaw = yawTo(fp);
+  const backYaw = yawTo(bp);
+  const fm = margin(frontYaw, model.yaw.front);
+  const bm = margin(backYaw, model.yaw.back);
+  const fr = fm >= 0;
+  const br = bm >= 0;
   return {
     cell: t.cell,
     x: t.x,
     y: t.y,
-    frontDistIn: frontDist,
-    backDistIn: backDist,
+    frontDistIn: dist(fp, t),
+    backDistIn: dist(bp, t),
     bearingDeg: wrapDeg(Math.atan2(t.y - pose.y, t.x - pose.x) / DEG),
-    turretCmdDeg: cmd,
-    reachable: margin >= 0,
-    turretMarginDeg: margin,
+    frontYawDeg: frontYaw,
+    backYawDeg: backYaw,
+    frontReachable: fr,
+    backReachable: br,
+    reachable: fr || br,
+    fires: fr && br ? "both" : fr ? "front" : br ? "back" : "none",
+    turretMarginDeg: Math.max(fm, bm),
   };
+}
+
+// The distances a launcher with a fixed launch angle (no hood) scores from. The CELL opening faces up, so the element
+// has to be coming down when it gets there: the top of its flight is before the CELL, which needs
+// distance >= 2 (CELL height - release height) / tan(angle). Any shorter and it is still rising at the CELL. The far
+// end needs the launcher's top exit speed, which nothing measures, so it is not computed.
+export function reachBand(m: RobotModel, side: "front" | "back"): { minIn: number } | { why: string } {
+  const l = m.launch[side];
+  const missing = [Number.isNaN(l.deg) && `${side}LaunchDeg`, Number.isNaN(l.releaseIn) && `${side}ReleaseHeightIn`, Number.isNaN(m.cellHeightIn) && "cellHeightIn"].filter(Boolean);
+  if (missing.length) return { why: `${missing.join(", ")} not set` };
+  if (!(l.deg > 0 && l.deg < 90)) return { why: `${side}LaunchDeg ${l.deg} is not between 0 and 90` };
+  const rise = m.cellHeightIn - l.releaseIn;
+  return { minIn: rise > 0 ? (2 * rise) / Math.tan(l.deg * DEG) : 0 };
+}
+
+export function reachText(m: RobotModel, side: "front" | "back"): string {
+  const b = reachBand(m, side);
+  return "minIn" in b ? `scores from ${round(b.minIn)} in out (fixed ${m.launch[side].deg} deg launch; the far end needs its top exit speed, not measured)` : `reach band not computed (${b.why})`;
+}
+
+// What the load model lets the intake take: 4 POLLEN with no NECTAR, or at most 2 NECTAR + 2 POLLEN.
+function roomFor(held: HeldItem[], type: "POLLEN" | "NECTAR", m: RobotModel): number {
+  const nectar = held.filter((h) => h.type === "NECTAR").length;
+  const pollen = held.length - nectar;
+  const free = Math.max(0, m.capacity - held.length);
+  const room = type === "NECTAR" ? (pollen > m.pollenWithNectar ? 0 : m.nectarMax - nectar) : nectar > 0 ? m.pollenWithNectar - pollen : free;
+  return Math.max(0, Math.min(free, room));
 }
 
 function clusters(elements: StagedElement[]): { x: number; y: number; ids: string[] }[] {
@@ -534,7 +576,7 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
   const cutLegIds: string[] = [];
   let worst = 0;
   let aborted = false;
-  // the ramp servo: what AutoRunner commands, in time order (only real changes: set(true) on a ramp that is
+  // the ramp servos: what AutoRunner commands, in time order (only real changes: set(true) on a ramp that is
   // already out, or stowRamp on one that is in, moves nothing)
   const rampMoves: RampMove[] = [];
   let rampCommanded = false;
@@ -552,7 +594,11 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
     }
   };
   const movesNow = () => (rampFold ? [...rampMoves, rampFold] : rampMoves);
-  const rampAt = (at: number) => rampOutAt(movesNow(), model.rampTravelS, at);
+  const rampTimes: RampTimes = { outS: model.rampOutS, inS: model.rampInS };
+  const rampAt = (at: number) => rampOutAt(movesNow(), rampTimes, at);
+  // where each turret was last sent: both start straight forward, and they track the CELL while the robot drives
+  const turretAt = { front: 0, back: 0 };
+  const reachUnknown = new Set<string>();
 
   for (let i = 0; i < spec.legs.length; i++) {
     const leg = spec.legs[i];
@@ -598,6 +644,7 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
       timesOut: rawTravel > timeoutS,
       endActionS: 0,
       endActionWorstS: 0,
+      endActionText: "",
       startS,
       endS: startS + travel,
       cut,
@@ -634,12 +681,13 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
           if (!lf.flowerReached.includes(e.id)) lf.flowerReached.push(e.id);
           continue;
         }
-        if (held.length >= model.capacity) {
+        const room = roomFor(held, e.type, model);
+        if (room <= 0) {
           if (!lf.missedFull.includes(e.id)) lf.missedFull.push(e.id);
           continue;
         }
         // how many one ramp pass frees is not measured yet, so a stack counts as unconfirmed
-        const taken = stack ? Math.min(e.count ?? 1, model.capacity - held.length) : 1;
+        const taken = stack ? Math.min(e.count ?? 1, room) : 1;
         for (let n = 0; n < taken; n++) {
           held.push({ id: taken > 1 ? `${e.id}#${n + 1}` : e.id, type: e.type, confirmed: !stack && !e.unconfirmed });
           lf.picked.push({ id: e.id, type: e.type, atS: round(tAbs, 2), confirmed: !stack && !e.unconfirmed });
@@ -693,14 +741,14 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
       }
       const arrive = startS + travel;
       lf.ramp.atArrival = rampAt(arrive);
-      // End.WAIT holds still with the intake and the ramp as they were: a ramp still swinging out on arrival
+      // End.WAIT holds still with the intake and the ramp as they were: a ramp still coming out on arrival
       // takes the stack in front of it once it is out, if the wait lasts that long
       const holdS = leg.end === "WAIT" ? (leg.waitS ?? 0) : 0;
       const last = g.samples[g.samples.length - 1];
       if (holdS > 0 && last && cut === "none") {
         const endPose = { x: last.x, y: last.y, headingDeg: last.headingDeg };
         const until = Math.min(arrive + holdS, model.abortAtS);
-        const outAt = rampReachesAt(movesNow(), model.rampTravelS, arrive, 1);
+        const outAt = rampReachesAt(movesNow(), rampTimes, arrive, 1);
         if (outAt !== null && outAt > arrive && outAt <= until) pickAt(endPose, outAt, lf.intakeRuns || outAt <= carryUntil, false);
         rampTouches(endPose, rampAt(until));
       }
@@ -731,6 +779,7 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
     const flags: string[] = [];
     let endActionS = 0;
     let endWorst = 0;
+    let endText = "";
     if (g.drawable && ep) {
       const endSample = g.samples[g.samples.length - 1];
       const hEnd = endSample?.headingDeg ?? ep.h;
@@ -738,36 +787,73 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
       const aim = solveAim(pose, model);
       const fp = footprint(pose, model.body);
       const clear = wallClearance(fp);
-      const firing = held.some((h) => h.type === "NECTAR") ? Math.max(aim.frontDistIn, aim.backDistIn) : aim.backDistIn;
-      const firingMin = held.some((h) => h.type === "NECTAR") ? Math.min(aim.frontDistIn, aim.backDistIn) : aim.backDistIn;
+      // the launchers that send something here: the front fires NECTAR, the back POLLEN, each only in its turret's reach
+      const nectarHeld = held.filter((h) => h.type === "NECTAR").length;
+      const useFront = aim.frontReachable && nectarHeld > 0;
+      const sides = (["front", "back"] as const).filter((sd) => (sd === "front" ? useFront : aim.backReachable || !useFront));
+      const distOf = (sd: "front" | "back") => (sd === "front" ? aim.frontDistIn : aim.backDistIn);
+      const firing = Math.max(...sides.map(distOf));
+      const firingMin = Math.min(...sides.map(distOf));
       const reasons: string[] = [];
       const bandEdge = Math.min(firingMin - model.shotMinIn, model.shotMaxIn - firing);
       if (firingMin < model.shotMinIn) reasons.push(`closer than the shortest shot (${round(firingMin)} < ${model.shotMinIn} in)`);
       if (firing > model.shotMaxIn) reasons.push(`farther than the longest shot (${round(firing)} > ${model.shotMaxIn} in)`);
-      if (!aim.reachable) reasons.push(`CELL outside yaw travel (needs ${round(aim.turretCmdDeg, 0)} deg)`);
+      if (!aim.reachable) reasons.push(`CELL outside both turrets' travel (front needs ${round(aim.frontYawDeg, 0)} deg, back ${round(aim.backYawDeg, 0)} deg)`);
+      // a fixed launch angle only scores from far enough out
+      for (const sd of sides.filter((x) => (x === "front" ? aim.frontReachable : aim.backReachable))) {
+        const band = reachBand(model, sd);
+        if (!("minIn" in band)) {
+          if (leg.end === "SHOOT") reachUnknown.add(`${sd} launcher: ${band.why}`);
+          continue;
+        }
+        if (distOf(sd) >= band.minIn) continue;
+        reasons.push(`${sd} launcher too close for its fixed launch (${round(distOf(sd))} < ${round(band.minIn)} in)`);
+        if (leg.end === "SHOOT") problems.push({ level: "warning", code: "shot.reach", where: `leg:${leg.id}`, message: `the ${sd} launcher cannot score from ${leg.id}: ${round(distOf(sd))} in from the CELL, and with its fixed ${model.launch[sd].deg} deg launch it ${reachText(model, sd)}` });
+      }
       if (clear < model.wallMarginIn) reasons.push(`within ${model.wallMarginIn} in of a wall`);
       if (pack.obstacles.some((o) => polygonsOverlap(fp, rectPolygon(o.rect)))) reasons.push("footprint on a field element");
       if (fp.some((p) => p.x < MID)) reasons.push("not fully on the blue side");
       const inZone = reasons.length === 0;
 
+      // the turrets track the CELL while the robot drives (clipped to their travel): a shot waits for any turret
+      // still turning on arrival, at yawDegPerS from where it was last sent (not counted until program 3 times it)
+      const clip = (sd: "front" | "back") => Math.min(model.yaw[sd].maxDeg, Math.max(model.yaw[sd].minDeg, sd === "front" ? aim.frontYawDeg : aim.backYawDeg));
+      const timed = model.yawDegPerS > 0;
+      const turnS = (sd: "front" | "back") => (timed ? Math.abs(clip(sd) - turretAt[sd]) / model.yawDegPerS : 0);
       if (leg.end === "SHOOT") {
         if (!aim.reachable) {
           shotSkipped = true;
           endActionS = leg.shotTimeoutS ?? model.shotAbandonS;
           endWorst = endActionS;
-          flags.push("shot skipped: CELL outside yaw travel, AutoRunner gives up after the shot timeout");
+          endText = `shot skipped: neither turret reaches the CELL, AutoRunner gives up after ${round(endActionS, 2)} s`;
+          flags.push("shot skipped: CELL outside both turrets' travel, AutoRunner gives up after the shot timeout");
         } else {
-          endActionS = model.settleS + model.gateTravelS + model.feedS;
-          endWorst = Math.min(model.readyTimeoutS + model.settleS, leg.shotTimeoutS ?? Infinity) + model.shotAbandonS;
-          fired = Math.min(held.length, model.elementsPerShot);
+          const fires = aim.fires as "both" | "front" | "back";
+          const reaching = (["front", "back"] as const).filter((sd) => fires === "both" || fires === sd);
+          const waitTurret = Math.max(0, Math.max(0, ...reaching.map(turnS)) - travel);
+          endActionS = waitTurret + model.settleS + model.gateTravelS + model.feedS;
+          endWorst = Math.min(waitTurret + model.readyTimeoutS + model.settleS, leg.shotTimeoutS ?? Infinity) + model.shotAbandonS;
+          // collecting and firing POLLEN run the main intake and the POLLEN feeder; firing NECTAR the main intake
+          const motors = fires === "front" ? "main intake feeds NECTAR" : "main intake + POLLEN feeder";
+          endText = `${timed ? `turrets ${round(waitTurret, 2)} s` : "turrets not timed (yawDegPerS not set)"} + settle ${model.settleS} s + gates ${model.gateTravelS} s + feed ${model.feedS} s; fires ${fires === "both" ? "both launchers" : `${fires} only`} (${motors})`;
+          // only the lanes whose launcher fires empty; POLLEN first (NECTAR is the backup)
+          const lane = held.filter((h) => (h.type === "NECTAR" ? aim.frontReachable : aim.backReachable)).sort((a, b) => (a.type === b.type ? 0 : a.type === "POLLEN" ? -1 : 1));
+          const out = lane.slice(0, Math.min(lane.length, model.elementsPerShot));
+          fired = out.length;
           if (before === 0) flags.push("empty shot: holding 0");
+          else if (fired === 0) flags.push(`empty shot: fires ${fires} only and holds no ${fires === "front" ? "NECTAR" : "POLLEN"}`);
+          if (fires !== "both") {
+            const other = fires === "front" ? "back" : "front";
+            flags.push(`fires ${fires} only: the ${other} turret cannot reach the CELL (needs ${round(other === "front" ? aim.frontYawDeg : aim.backYawDeg, 0)} deg), its gate stays shut`);
+          }
           if (!inZone) flags.push(`shot outside the shooting zone: ${reasons.join("; ")}`);
-          const out = held.slice(0, fired);
-          shot = { pollen: out.filter((h) => h.type === "POLLEN").length, nectar: out.filter((h) => h.type === "NECTAR").length, inZone, atS: startS + travel + endActionS };
-          held.splice(0, fired);
+          shot = { pollen: out.filter((h) => h.type === "POLLEN").length, nectar: out.filter((h) => h.type === "NECTAR").length, inZone, atS: startS + travel + endActionS, turretS: round(waitTurret, 2), fires };
+          for (const h of out) held.splice(held.indexOf(h), 1);
           invTimeline.push({ t: startS + travel + endActionS, held: held.length });
         }
       }
+      turretAt.front = clip("front");
+      turretAt.back = clip("back");
       const cl = clusters([...remaining.values()].filter((e) => e.access === "floor"));
       const near = cl.map((c) => ({ c, d: Math.hypot(c.x - ep.x, c.y - ep.y) })).sort((a, b) => a.d - b.d)[0] ?? null;
       const onCluster = lf.picked.length > 0 || (near !== null && near.d < Math.max(model.body.front, model.body.back) + model.intakeReachIn + 6);
@@ -825,7 +911,7 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
         headingOutDeg: nextGeo?.drawable ? (nextGeo.samples[0]?.headingDeg ?? null) : null,
         target: aim,
         zone: { in: inZone, edgeIn: bandEdge, reasons },
-        inventory: { atLegStart: heldAtLegStart, before, after: held.length, picked: lf.picked.length, fired, beforeConfirmed },
+        inventory: { atLegStart: heldAtLegStart, before, nectarBefore: nectarHeld, after: held.length, picked: lf.picked.length, fired, beforeConfirmed },
         flags,
         shotSkipped,
         shot,
@@ -838,6 +924,7 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
     }
     lf.endActionS = endActionS;
     lf.endActionWorstS = endWorst;
+    lf.endActionText = leg.end === "WAIT" ? `wait ${leg.waitS ?? 0} s` : endText;
     // runLeg(): a SHOOT stows the ramp when the path is done, before it aims, except on a RAMP leg (its ramp is still
     // in the FLOWER: it folds once the next leg has backed away); PARK ends the auto (finish stows it)
     const arriveS = startS + travel;
@@ -848,30 +935,30 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
     }
     {
       const legEnd = Math.min(arriveS + endActionS + (leg.end === "WAIT" ? (leg.waitS ?? 0) : 0), model.abortAtS);
-      const outAt = leg.during === "RAMP" && cut !== "never" ? rampReachesAt(movesNow(), model.rampTravelS, startS, 1) : null;
+      const outAt = leg.during === "RAMP" && cut !== "never" ? rampReachesAt(movesNow(), rampTimes, startS, 1) : null;
       lf.ramp.outAtS = outAt !== null && outAt <= legEnd + 1e-9 ? round(outAt, 2) : null;
       if (lf.ramp.outAtS !== null) lf.ramp.maxOut = 1;
       lf.ramp.late = lf.ramp.late.filter((id) => !lf.picked.some((p) => p.id === id));
       if (leg.during === "RAMP" && cut !== "never") {
         const pct = (v: number) => `${Math.round(v * 100)}%`;
         if (lf.ramp.late.length) {
-          const needS = Math.ceil((1 - lf.ramp.atArrival) * model.rampTravelS * 10) / 10;
+          const needS = Math.ceil((1 - lf.ramp.atArrival) * model.rampOutS * 10) / 10;
           problems.push({
             level: "warning",
             code: "ramp.late",
             where: `leg:${leg.id}`,
-            message: `the ramp is not out yet when ${leg.id} reaches ${lf.ramp.late.join(", ")} (${pct(lf.ramp.atArrival)} out on arrival; it needs ${model.rampTravelS} s from folded in): nothing comes out of the FLOWER there. End ${leg.id} with a WAIT of at least ${needS} s, or put the ramp out on the leg before`,
+            message: `the ramp is not out yet when ${leg.id} reaches ${lf.ramp.late.join(", ")} (${pct(lf.ramp.atArrival)} out on arrival; it needs ${model.rampOutS} s from stowed): nothing comes out of the FLOWER there. End ${leg.id} with a WAIT of at least ${needS} s, or put the ramp out on the leg before`,
           });
         } else if (lf.ramp.outAtS === null) {
           problems.push({
             level: "warning",
             code: "ramp.neverOut",
             where: `leg:${leg.id}`,
-            message: `the ramp never gets fully out on ${leg.id} (at most ${pct(lf.ramp.maxOut)}): the leg lasts ${round(legEnd - startS, 2)} s and the ramp needs ${model.rampTravelS} s`,
+            message: `the ramp never gets fully out on ${leg.id} (at most ${pct(lf.ramp.maxOut)}): the leg lasts ${round(legEnd - startS, 2)} s and the ramp needs ${model.rampOutS} s to come out`,
           });
         }
       }
-      if (lf.ramp.hitsWall) problems.push({ level: "warning", code: "ramp.wall", where: `leg:${leg.id}`, message: `the ramp reaches into the wall on ${leg.id}: its servo stalls against it and it pushes the robot off the path` });
+      if (lf.ramp.hitsWall) problems.push({ level: "warning", code: "ramp.wall", where: `leg:${leg.id}`, message: `the ramp reaches into the wall on ${leg.id}: the strings stall it against the wall and it pushes the robot off the path` });
       for (const o of lf.ramp.hits) problems.push({ level: "warning", code: "ramp.obstacle", where: `leg:${leg.id}`, message: `the ramp touches ${o} on ${leg.id}` });
     }
     // AutoRunner's abort check also stops a shot that is still firing
@@ -927,18 +1014,20 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
     if (!ok) problems.push({ level: "error", code: "rule.R105", where: "spec", message: `with the ramp out the robot is ${round(lengthIn)} x ${round(widthIn)} in: over the ${lim[0]} x ${lim[1]} in limit (${pack.rules.expanded!.rule})` });
   }
   if (rampUsed && !model.rampCalibrated) {
-    problems.push({ level: "warning", code: "ramp.positions", where: "spec", message: "the ramp positions are not in the robot code yet (rampStowed / rampDeployed, program 4): until they are, AutoRunner never moves the ramp and the RAMP legs take nothing from a FLOWER" });
+    problems.push({ level: "warning", code: "ramp.times", where: "spec", message: `the ramp times are not measured in the robot code yet (Tuned.rampOutS / rampInS, program 4): until they are, AutoRunner never moves the ramp and the RAMP legs take nothing from a FLOWER; AutoTool draws it with out ${model.rampOutS} s, in ${model.rampInS} s` });
   }
-  const rampEnd = Math.max(t, ...rampMoves.map((m) => m.t + model.rampTravelS));
+  if (reachUnknown.size) problems.push({ level: "warning", code: "shot.reachUnknown", where: "spec", message: `the reach of the fixed-angle launchers is not checked: ${[...reachUnknown].join("; ")}` });
+  const rampEnd = Math.max(t, ...rampMoves.map((m) => m.t + Math.max(model.rampOutS, model.rampInS)));
   const ramp: RampFeatures = {
     used: rampUsed,
     calibrated: model.rampCalibrated,
-    travelS: model.rampTravelS,
+    outS: model.rampOutS,
+    inS: model.rampInS,
     reachIn: model.rampReachIn,
     widthIn: model.intakeWidthIn,
     end: model.intakeEnd,
     moves: rampMoves,
-    segments: rampSegments(rampMoves, model.rampTravelS, rampEnd),
+    segments: rampSegments(rampMoves, rampTimes, rampEnd),
     expanded,
   };
 

@@ -25,7 +25,7 @@ export const legKey = (l: { during: During; end: End; junction?: { review?: bool
 // First match per field wins. during and end are decided separately: a leg can collect on the way and shoot at the end.
 export const RUBRIC = [
   { field: "end", value: "PARK", when: "it is the last leg and the footprint is at least partially in the LOADING ZONE" },
-  { field: "end", value: "SHOOT", when: "it ends in the shooting zone, the turret can reach the CELL, and the robot holds at least 1 element on arrival (counting what this leg picks up)" },
+  { field: "end", value: "SHOOT", when: "it ends in the shooting zone, a turret can reach the CELL, and the robot holds at least 1 element a reaching launcher fires on arrival (front = NECTAR, back = POLLEN; counting what this leg picks up)" },
   { field: "end", value: "WAIT", when: "only when the team asks for a hold at the end (to finish pulling elements in); give the seconds" },
   { field: "end", value: "NONE", when: "otherwise: the leg sets up the next one" },
   { field: "during", value: "INTAKE", when: "the leg runs over floor elements (or ends on a cluster) and the robot holds fewer than capacity when it starts" },
@@ -39,7 +39,8 @@ export function evidenceFor(j: JunctionFeatures, leg: LegFeatures | undefined, m
   e.push(`move.in=${round(j.moveIn)}in`);
   if (j.turnDeg !== null) e.push(`turn=${round(j.turnDeg, 0)}deg`);
   e.push(j.zone.in ? `zone.in edge=${round(j.zone.edgeIn)}in` : `zone.out(${j.zone.reasons.join("; ")})`);
-  e.push(`${j.target.cell}CELL dist=${round(j.target.backDistIn)}in turret=${round(j.target.turretCmdDeg, 0)}deg ${j.target.reachable ? "reachable" : "UNREACHABLE"}`);
+  const reach = { both: "reachable", front: "front only", back: "back only", none: "UNREACHABLE" }[j.target.fires];
+  e.push(`${j.target.cell}CELL dist=${round(j.target.backDistIn)}in turret front=${round(j.target.frontYawDeg, 0)}deg back=${round(j.target.backYawDeg, 0)}deg ${reach}`);
   e.push(`inventory.legStart=${j.inventory.atLegStart} before=${j.inventory.before}${j.inventory.beforeConfirmed ? "" : "(unconfirmed)"}`);
   if (leg && leg.sweepable.length) e.push(`sweeps=${leg.sweepable.length}`);
   if (j.inventory.picked) e.push(`picked=${j.inventory.picked}`);
@@ -57,7 +58,10 @@ export function decideStop(j: JunctionFeatures, leg: LegFeatures | undefined, m:
   const sweeps = (leg?.sweepable.length ?? 0) > 0 || j.onCluster;
   // the ramp is the team's call (FLOWER bottoms are not in the field map): keep it when it is set
   const during: During = j.during === "RAMP" ? "RAMP" : sweeps && j.inventory.atLegStart < m.capacity ? "INTAKE" : "NONE";
-  const holding = j.inventory.before > 0 || (during !== "NONE" && (leg?.sweepable.length ?? 0) > 0);
+  // each launcher fires its own lane (front NECTAR, back POLLEN) only when its turret reaches; floor elements are POLLEN
+  const nectar = j.inventory.nectarBefore;
+  const pollen = j.inventory.before - nectar > 0 || (during !== "NONE" && (leg?.sweepable.length ?? 0) > 0);
+  const holding = (j.target.fires !== "front" && pollen) || (j.target.fires !== "back" && nectar > 0);
   const mk = (end: End, rule: string, review = false, suggestion?: string): StopDecision => ({
     junction: j.id,
     during,

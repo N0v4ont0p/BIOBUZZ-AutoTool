@@ -51,12 +51,14 @@ test("geometry: bezier ends, line length, angle wrap", () => {
   assert.equal(wrapDeg(-180), 180);
 });
 
-test("aim: robot facing the CELL needs ~0 deg of turret; facing away is out of travel", () => {
+test("aim: robot facing the CELL needs ~0 deg of either turret; facing away is out of travel", () => {
   const facing = solveAim({ x: 118, y: 90, headingDeg: 187.95 }, model);
-  assert.ok(Math.abs(facing.turretCmdDeg) < 1, `cmd ${facing.turretCmdDeg}`);
+  assert.ok(Math.abs(facing.frontYawDeg) < 1 && Math.abs(facing.backYawDeg) < 1, `front ${facing.frontYawDeg} back ${facing.backYawDeg}`);
   assert.equal(facing.cell, "far");
+  assert.equal(facing.fires, "both");
   const away = solveAim({ x: 118, y: 90, headingDeg: 7.95 }, model);
   assert.equal(away.reachable, false);
+  assert.equal(away.fires, "none");
 });
 
 test("features: sample auto has the expected stops, inventory and time", () => {
@@ -591,19 +593,20 @@ test("features: a RAMP leg takes POLLEN from a FLOWER stack, an INTAKE leg does 
   assert.ok(short.junctions[0].flags.some((f) => /RAMP leg takes nothing: it ends 12\.5 in from the FLOWER F3/.test(f)), short.junctions[0].flags.join("|"));
 });
 
-test("ramp: AutoRunner's commands at the servo's travel time; late, waited-for, never out; positions; R105", async () => {
+test("ramp: AutoRunner's commands at the measured out / in times; late, waited-for, never out; times; R105", async () => {
   const { rampOutAt } = await import("../src/shared/features.ts");
   // reversing mid-swing turns back from where it is
   const moves = [
     { t: 0, out: true, why: "", legId: null },
     { t: 0.2, out: false, why: "", legId: null },
   ];
-  assert.ok(Math.abs(rampOutAt(moves, 0.5, 0.2) - 0.4) < 1e-9);
-  assert.ok(Math.abs(rampOutAt(moves, 0.5, 0.3) - 0.2) < 1e-9);
-  assert.equal(rampOutAt(moves, 0.5, 1), 0);
+  const half = { outS: 0.5, inS: 0.5 };
+  assert.ok(Math.abs(rampOutAt(moves, half, 0.2) - 0.4) < 1e-9);
+  assert.ok(Math.abs(rampOutAt(moves, half, 0.3) - 0.2) < 1e-9);
+  assert.equal(rampOutAt(moves, half, 1), 0);
 
   // a RAMP leg straight at the F3 stack: start `fromX`, stop at x = 129 (the ramp reaches it, the intake does not)
-  const run = (fromX: number, end: "NONE" | "WAIT" | "SHOOT", waitS: number | null, set: Record<string, number | string> = {}) => {
+  const run = (fromX: number, end: "NONE" | "WAIT" | "SHOOT", waitS: number | null, set: Record<string, number | string> = {}, inCode: string[] = []) => {
     const s = sampleSpec();
     s.preload.POLLEN = 0;
     Object.assign(s.poses.find((x) => x.name === "shot1")!, { x: 129, y: 96, headingDeg: 0 });
@@ -612,8 +615,8 @@ test("ramp: AutoRunner's commands at the servo's travel time; late, waited-for, 
     const facts = defaultFacts();
     facts.rampReachIn.value = 4;
     facts.intakeReachIn.value = 1;
-    facts.rampTravelS.value = 0.55;
     for (const [k, v] of Object.entries(set)) facts[k].value = v;
+    for (const k of inCode) facts[k].repoValue = facts[k].value; // read from the robot code
     return computeFeatures(s, pack, robotModel(facts));
   };
   // a long approach: out before it gets there, so it takes the stack
@@ -664,9 +667,12 @@ test("ramp: AutoRunner's commands at the servo's travel time; late, waited-for, 
   assert.ok(next.travelS < 3, String(next.travelS));
   assert.ok(Math.abs(shotNext.ramp.moves[1].t - (next.startS + next.travelS)) < 1e-9, JSON.stringify(shotNext.ramp.moves));
   assert.equal(shotNext.ramp.moves[1].why, "L2 stows it to shoot");
-  // the robot never moves it until program 4 has put both positions in the code
-  assert.ok(far.problems.some((p) => p.code === "ramp.positions"));
-  assert.ok(!run(110, "NONE", null, { rampPositions: "set" }).problems.some((p) => p.code === "ramp.positions"));
+  // the robot never moves it until program 4 has put both times in the code
+  assert.ok(far.problems.some((p) => p.code === "ramp.times"));
+  assert.equal(run(110, "NONE", null, {}, ["rampOutS"]).ramp.calibrated, false);
+  const timed = run(110, "NONE", null, {}, ["rampOutS", "rampInS"]);
+  assert.equal(timed.ramp.calibrated, true);
+  assert.ok(!timed.problems.some((p) => p.code === "ramp.times"));
   // out, the ramp makes the robot longer: over 18 x 24 in breaks R105
   assert.ok(!far.problems.some((p) => p.code === "rule.R105"));
   const long = run(110, "NONE", null, { rampReachIn: 7 });
@@ -684,6 +690,132 @@ test("ramp: AutoRunner's commands at the servo's travel time; late, waited-for, 
   const none = computeFeatures(sampleSpec(), pack, model);
   assert.equal(none.ramp.used, false);
   assert.deepEqual(none.ramp.moves, []);
+});
+
+const robotWith = (set: Record<string, number>) => {
+  const facts = defaultFacts();
+  for (const [k, v] of Object.entries(set)) facts[k].value = v;
+  return robotModel(facts);
+};
+// team-config.yaml launcher_geometry (CAD v1, 2026-10-17)
+const CAD_LAUNCH = { frontLaunchDeg: 59, backLaunchDeg: 59, frontReleaseHeightIn: 12.2, backReleaseHeightIn: 12.0 };
+
+test("ramp: comes out in rampOutS and folds in rampInS; a fold midway turns back from where it is", async () => {
+  const { rampOutAt } = await import("../src/shared/features.ts");
+  const moves = [
+    { t: 0, out: true, why: "", legId: null },
+    { t: 0.25, out: false, why: "", legId: null },
+  ];
+  const r = { outS: 0.5, inS: 1 };
+  assert.ok(Math.abs(rampOutAt(moves, r, 0.25) - 0.5) < 1e-9);
+  assert.ok(Math.abs(rampOutAt(moves, r, 0.5) - 0.25) < 1e-9);
+  assert.equal(rampOutAt(moves, r, 0.75), 0);
+  const run = (outS: number, inS: number) => {
+    const s = sampleSpec();
+    s.preload.POLLEN = 0;
+    Object.assign(s.poses.find((x) => x.name === "shot1")!, { x: 129, y: 96, headingDeg: 0 });
+    Object.assign(s.poses.find((x) => x.name === "start")!, { x: 110, y: 96, headingDeg: 0 });
+    s.legs[0] = { ...s.legs[0], during: "RAMP", end: "NONE" };
+    return computeFeatures(s, pack, robotWith({ rampReachIn: 4, intakeReachIn: 1, rampOutS: outS, rampInS: inS }));
+  };
+  const slowIn = run(0.8, 1.6);
+  assert.equal(slowIn.legs[0].ramp.outAtS, 0.8);
+  assert.deepEqual([slowIn.ramp.outS, slowIn.ramp.inS], [0.8, 1.6]);
+  const out = slowIn.ramp.segments.find((g) => g.state === "deploying")!;
+  const fold = slowIn.ramp.segments.find((g) => g.state === "stowing")!;
+  assert.ok(Math.abs(out.toS - out.fromS - 0.8) < 1e-9 && Math.abs(fold.toS - fold.fromS - 1.6) < 1e-9, JSON.stringify(slowIn.ramp.segments));
+  const quick = run(0.3, 0.4);
+  assert.equal(quick.legs[0].ramp.outAtS, 0.3);
+  const qf = quick.ramp.segments.find((g) => g.state === "stowing")!;
+  assert.ok(Math.abs(qf.toS - qf.fromS - 0.4) < 1e-9);
+});
+
+test("ramp: times not measured in the robot code warn and fall back to the profile defaults", () => {
+  const s = sampleSpec();
+  s.legs[2] = { ...s.legs[2], during: "RAMP" };
+  const f = computeFeatures(s, pack, model);
+  const w = f.problems.find((p) => p.code === "ramp.times");
+  assert.ok(w && /rampOutS \/ rampInS/.test(w.message) && /out 0\.55 s, in 0\.55 s/.test(w.message), w?.message);
+  assert.equal(f.ramp.calibrated, false);
+  assert.deepEqual([f.ramp.outS, f.ramp.inS], [0.55, 0.55]);
+  assert.ok(!f.problems.some((p) => p.code === "ramp.positions"));
+  // no RAMP leg: nothing to warn about
+  assert.ok(!computeFeatures(sampleSpec(), pack, model).problems.some((p) => p.code === "ramp.times"));
+});
+
+test("reach: a fixed launch angle scores only from far enough out; a SHOOT closer warns with the launcher and band", async () => {
+  const { reachBand } = await import("../src/shared/features.ts");
+  const m = robotWith(CAD_LAUNCH);
+  const back = reachBand(m, "back");
+  assert.ok("minIn" in back);
+  // the element must come down into the CELL (46 in): 2 x (46 - 12) / tan 59
+  assert.ok(Math.abs(back.minIn - (2 * 34) / Math.tan((59 * Math.PI) / 180)) < 1e-9);
+  // the sample's first shot is about 34 in from the CELL, holding POLLEN only: too close for the back launcher
+  const f = computeFeatures(sampleSpec(), pack, m);
+  const w = f.problems.find((p) => p.code === "shot.reach" && p.where === "leg:L1");
+  assert.ok(w && /the back launcher cannot score from L1/.test(w.message) && /scores from 40\.9 in out/.test(w.message), w?.message);
+  assert.equal(f.junctions[0].zone.in, false);
+  // farther out it scores
+  const s = sampleSpec();
+  s.poses.find((p) => p.name === "shot1")!.x = 130;
+  const ok = computeFeatures(s, pack, m);
+  assert.ok(!ok.problems.some((p) => p.code === "shot.reach" && p.where === "leg:L1"));
+  assert.equal(ok.junctions[0].zone.in, true);
+  // without the CAD numbers the band is not guessed, and the tool says so
+  assert.deepEqual(reachBand(model, "front"), { why: "frontLaunchDeg, frontReleaseHeightIn not set" });
+  const unknown = computeFeatures(sampleSpec(), pack, model);
+  assert.ok(!unknown.problems.some((p) => p.code === "shot.reach"));
+  assert.match(unknown.problems.find((p) => p.code === "shot.reachUnknown")!.message, /back launcher: backLaunchDeg, backReleaseHeightIn not set/);
+});
+
+test("turrets: each aims on its own; a stop only one reaches fires that launcher only, and the shot waits for the turret", () => {
+  // heading 232 at shot1: each turret needs about -44 deg
+  const turned = (preload = { POLLEN: 4, NECTAR: 0, onTiles: 0 }) => {
+    const s = sampleSpec();
+    s.preload = preload;
+    s.poses.find((p) => p.name === "shot1")!.headingDeg = 232;
+    return s;
+  };
+  const narrowBack = robotWith({ backYawMinDeg: -20, backYawMaxDeg: 20 });
+  const front = computeFeatures(turned(), pack, narrowBack).junctions[0];
+  assert.equal(front.target.fires, "front");
+  assert.equal(front.shotSkipped, false);
+  assert.ok(front.flags.some((x) => /^fires front only: the back turret cannot reach/.test(x)), front.flags.join("|"));
+  // the front launcher fires NECTAR: with POLLEN only aboard nothing leaves, and the rubric does not shoot there
+  assert.deepEqual([front.inventory.fired, front.inventory.after], [0, 4]);
+  assert.ok(front.flags.some((x) => x.startsWith("empty shot: fires front only")));
+  const fl = computeFeatures(turned(), pack, narrowBack);
+  assert.notEqual(decideStop(fl.junctions[0], fl.legs[0], narrowBack).end, "SHOOT");
+  // ...but it fires the NECTAR it holds, and the POLLEN stays
+  const nectar = computeFeatures(turned({ POLLEN: 2, NECTAR: 1, onTiles: 0 }), pack, narrowBack).junctions[0];
+  assert.deepEqual([nectar.shot?.nectar, nectar.shot?.pollen, nectar.inventory.after], [1, 0, 2]);
+  assert.equal(decideStop(nectar, undefined, narrowBack).end, "SHOOT");
+  // the other way round: the back launcher fires the POLLEN
+  const back = computeFeatures(turned(), pack, robotWith({ frontYawMinDeg: -20, frontYawMaxDeg: 20 })).junctions[0];
+  assert.equal(back.target.fires, "back");
+  assert.ok(back.flags.some((x) => /^fires back only/.test(x)));
+  assert.deepEqual([back.inventory.fired, back.shot?.fires], [4, "back"]);
+  // turret speed: the shot waits for the turret still turning on arrival (it turns from straight forward while driving)
+  const base = computeFeatures(turned(), pack, narrowBack);
+  const slow = computeFeatures(turned(), pack, robotWith({ backYawMinDeg: -20, backYawMaxDeg: 20, yawDegPerS: 10 }));
+  const need = Math.abs(slow.junctions[0].target.frontYawDeg) / 10 - slow.legs[0].travelS;
+  assert.ok(need > 0.5, String(need));
+  assert.ok(Math.abs(slow.legs[0].endActionS - base.legs[0].endActionS - need) < 1e-9);
+  assert.match(slow.legs[0].endActionText, /^turrets \d/);
+  assert.match(base.legs[0].endActionText, /turrets not timed/);
+  assert.match(slow.legs[0].endActionText, /fires front only \(main intake feeds NECTAR\)/);
+});
+
+test("load: 4 POLLEN with no NECTAR, or at most 2 NECTAR + 2 POLLEN", () => {
+  const s = sampleSpec();
+  s.preload = { POLLEN: 0, NECTAR: 1, onTiles: 0 };
+  s.legs[0] = { ...s.legs[0], end: "NONE" };
+  const f = computeFeatures(s, pack, model);
+  assert.equal(f.legs[2].picked.length, 2);
+  assert.equal(f.legs[2].missedFull.length, 2);
+  assert.deepEqual([f.junctions[3].shot?.pollen, f.junctions[3].shot?.nectar], [2, 1]);
+  // with no NECTAR aboard the same sweep takes all 4
+  assert.equal(computeFeatures(sampleSpec(), pack, model).legs[2].picked.length, 4);
 });
 
 test("partner: two autos of one alliance run together; collisions, near misses, shared elements, one-click fixes", async () => {
@@ -786,10 +918,10 @@ test("profile merge: code values confirm themselves; the team is asked only abou
   assert.deepEqual([r.facts.settleS.status, r.facts.settleS.confirmed], ["assumed", false]);
   assert.equal(r.facts.feedS.confirmed, true);
   assert.deepEqual(r.changed.map((c) => [c.key, c.needsYou]), [["abortAtS", false], ["legTimeoutS", true], ["settleS", true]]);
-  // a fact a newer AutoTool reads (here the ramp travel time) is in use at once and announced, not a new setup
-  const added = mergeFacts(old, { ...fresh, rampTravelS: f("rampTravelS", { status: "assumed", confirmed: false }) });
-  assert.equal(added.facts.rampTravelS.confirmed, true);
-  assert.deepEqual(added.changed.find((c) => c.key === "rampTravelS"), { key: "rampTravelS", label: "Ramp travel time (folded in to out)", from: "new", to: "assumed 0.55 s", needsYou: false });
+  // a fact a newer AutoTool reads (here the ramp out time) is in use at once and announced, not a new setup
+  const added = mergeFacts(old, { ...fresh, rampOutS: f("rampOutS", { status: "assumed", confirmed: false }) });
+  assert.equal(added.facts.rampOutS.confirmed, true);
+  assert.deepEqual(added.changed.find((c) => c.key === "rampOutS"), { key: "rampOutS", label: "Ramp time, stowed to fully out", from: "new", to: "assumed 0.55 s", needsYou: false });
   // the first scan confirms nothing by itself (setup asks once)
   assert.equal(mergeFacts(undefined, fresh).facts.abortAtS.confirmed, false);
 });

@@ -121,7 +121,7 @@ export function evidenceLine(f: AutoFeatures, legId: string): string {
   parts.push(`${j.moveIn.toFixed(1)} in move`);
   if (j.turnDeg !== null && Math.abs(j.turnDeg) >= 5) parts.push(`turn ${j.turnDeg > 0 ? "+" : ""}${j.turnDeg.toFixed(0)}°`);
   parts.push(j.zone.in ? `in zone (${j.target.backDistIn.toFixed(1)} in, edge ${j.zone.edgeIn.toFixed(1)} in)` : `out of zone: ${j.zone.reasons[0] ?? ""}`);
-  parts.push(`turret ${j.target.turretCmdDeg.toFixed(0)}°${j.target.reachable ? "" : " UNREACHABLE"}`);
+  parts.push(`turrets ${j.target.frontYawDeg.toFixed(0)}° / ${j.target.backYawDeg.toFixed(0)}°${j.target.fires === "both" ? "" : j.target.fires === "none" ? " UNREACHABLE" : ` fires ${j.target.fires} only`}`);
   const leg = f.legs[j.index];
   if (leg?.sweepable.length) parts.push(`sweeps ${leg.sweepable.length}`);
   if (j.shotInCode) parts.push("shot in code");

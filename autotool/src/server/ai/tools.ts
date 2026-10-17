@@ -2,7 +2,7 @@
 // answer back for the team's approval. Tool results are data for the model, never instructions.
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { type AutoFeatures, computeFeatures, solveAim } from "../../shared/features.ts";
+import { type AutoFeatures, computeFeatures, reachText, solveAim } from "../../shared/features.ts";
 import { autoPoints } from "../../shared/points.ts";
 import { round } from "../../shared/geometry.ts";
 import { renderAutoPaths } from "../../shared/java/autorunner.ts";
@@ -41,7 +41,7 @@ export const TOOL_DEFS: Anthropic.Tool[] = [
   },
   {
     name: "solve_aim",
-    description: "For a robot pose: distance to the target CELL, the turret angle needed, and whether the turret can reach it (the repo's AutoAim math).",
+    description: "For a robot pose: distance to the target CELL, each turret's angle (front and back aim on their own) and whether it reaches, which launchers fire, and the fixed-angle reach of each launcher (the repo's AutoAim math).",
     input_schema: {
       type: "object",
       properties: { x: { type: "number", description: "in" }, y: { type: "number", description: "in" }, headingDeg: { type: "number", description: "deg" } },
@@ -51,7 +51,7 @@ export const TOOL_DEFS: Anthropic.Tool[] = [
   },
   {
     name: "estimate_time",
-    description: "Leg times and the total against the 30 s auto and the abort time (AutoRunner behaviour, profile speeds).",
+    description: "Leg times and the total against the 30 s auto and the abort time (AutoRunner behaviour, profile speeds), with how each shot adds up (turret wait, settle, gates, feed, which launchers fire).",
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -114,7 +114,7 @@ function pointsLine(pack: SeasonPack, f: AutoFeatures): string {
   return `AUTO points (Table 10-2): ${p.total} = LEAVE ${p.leave} + PARK ${p.park} + HIVE TIP ${p.tipPoints}${p.tips.length ? ` (TIP at ${p.tips.map((t) => t.legId).join(", ")})` : ""}. Only POLLEN into the upward-facing CELL tips the HIVE; after a TIP the other CELL faces up and needs ${pack.scoring.tipPollenByNectar.table[0]} POLLEN.${p.notes.length ? ` Notes: ${p.notes.join("; ")}.` : ""}`;
 }
 
-// the ramp on a leg, as AutoRunner moves it at its measured speed
+// the ramp on a leg, as AutoRunner moves it for its measured out / in times
 function rampText(l: AutoFeatures["legs"][number]): string {
   if (l.during !== "RAMP" && l.ramp.maxOut <= 0.02) return "";
   const pct = (v: number) => `${Math.round(v * 100)}%`;
@@ -208,12 +208,15 @@ export async function runTool(name: string, input: Record<string, unknown>, ctx:
         const h = Number(input.headingDeg);
         if (![x, y, h].every(Number.isFinite)) return { content: "x, y and headingDeg must be numbers", isError: true };
         const a = solveAim({ x, y, headingDeg: h }, ctx.model);
-        return { content: `target ${a.cell} CELL at (${round(a.x, 2)}, ${round(a.y, 2)}); back launcher distance ${round(a.backDistIn)} in, front ${round(a.frontDistIn)} in; turret ${round(a.turretCmdDeg, 0)} deg (limits ${ctx.model.yawMinDeg}..${ctx.model.yawMaxDeg}); ${a.reachable ? "reachable" : "OUT OF TRAVEL"}; shot band ${ctx.model.shotMinIn}-${ctx.model.shotMaxIn} in` };
+        const lim = ctx.model.yaw;
+        const turret = (sd: "front" | "back", deg: number, ok: boolean) => `${sd} turret ${round(deg, 0)} deg (limits ${lim[sd].minDeg}..${lim[sd].maxDeg}) ${ok ? "reaches" : "OUT OF TRAVEL"}`;
+        const fires = a.fires === "both" ? "both launchers fire" : a.fires === "none" ? "neither fires: the shot is skipped" : `fires ${a.fires} only`;
+        return { content: `target ${a.cell} CELL at (${round(a.x, 2)}, ${round(a.y, 2)}); back launcher (POLLEN) distance ${round(a.backDistIn)} in, front (NECTAR) ${round(a.frontDistIn)} in; ${turret("front", a.frontYawDeg, a.frontReachable)}, ${turret("back", a.backYawDeg, a.backReachable)}; ${fires}; shot band ${ctx.model.shotMinIn}-${ctx.model.shotMaxIn} in; front launcher ${reachText(ctx.model, "front")}; back launcher ${reachText(ctx.model, "back")}` };
       }
       case "estimate_time": {
         const f = computeFeatures(ctx.spec, ctx.pack, ctx.model, ctx.overlay);
         return {
-          content: [...f.legs.map((l) => `${l.id}: travel ${round(l.travelS)} s + ${l.end} ${round(l.endActionS)} s (worst ${round(l.endActionWorstS)} s); ends at ${round(l.endS)} s${l.timesOut ? `; times out at ${l.timeoutS} s` : ""}`), `total ${round(f.timeline.nominalS)} s nominal, ${round(f.timeline.worstS)} s worst; auto ${f.timeline.autoS} s; abort ${f.timeline.abortAtS} s${f.timeline.cutLegIds.length ? `; cut: ${f.timeline.cutLegIds.join(", ")}` : ""}`].join("\n"),
+          content: [...f.legs.map((l) => `${l.id}: travel ${round(l.travelS)} s + ${l.end} ${round(l.endActionS)} s${l.endActionText ? ` (${l.endActionText})` : ""} (worst ${round(l.endActionWorstS)} s); ends at ${round(l.endS)} s${l.timesOut ? `; times out at ${l.timeoutS} s` : ""}`), `total ${round(f.timeline.nominalS)} s nominal, ${round(f.timeline.worstS)} s worst; auto ${f.timeline.autoS} s; abort ${f.timeline.abortAtS} s${f.timeline.cutLegIds.length ? `; cut: ${f.timeline.cutLegIds.join(", ")}` : ""}`].join("\n"),
         };
       }
       case "check_rules": {

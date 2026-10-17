@@ -36,8 +36,8 @@ interface Want {
 }
 
 const WANT: Want[] = [
-  { title: "a shot from the zone with the preload", kind: "positive", want: "NONE/SHOOT", caseKind: ["synthetic"], pred: (_c, i) => i === 0, reason: "In the zone, the turret reaches the CELL, holding the preload: end SHOOT." },
-  { title: "looks like a shot, but the turret cannot reach the CELL", kind: "negative", want: "NONE/NONE", caseKind: ["perturbed"], pred: (c) => c.id.endsWith("_turret"), reason: "In the distance band but the CELL is outside yaw travel, so AutoRunner would skip the shot: end NONE, not SHOOT." },
+  { title: "a shot from the zone with the preload", kind: "positive", want: "NONE/SHOOT", caseKind: ["synthetic"], pred: (_c, i) => i === 0, reason: "In the zone, both turrets reach the CELL, holding the preload: end SHOOT." },
+  { title: "looks like a shot, but neither turret can reach the CELL", kind: "negative", want: "NONE/NONE", caseKind: ["perturbed"], pred: (c) => c.id.endsWith("_turret"), reason: "In the distance band but the CELL is outside both turrets' travel, so AutoRunner would skip the shot: end NONE, not SHOOT." },
   { title: "the leg into the GARDEN runs over POLLEN", kind: "positive", want: "INTAKE/NONE", caseKind: ["synthetic"], reason: "The leg sweeps floor POLLEN and the robot held fewer than capacity when it started: during INTAKE." },
   { title: "the last stop is in the LOADING ZONE", kind: "positive", want: "NONE/PARK", caseKind: ["synthetic"], reason: "Last leg, footprint partly in the LOADING ZONE: end PARK." },
   { title: "imported code that does not shoot where it could", kind: "positive", want: "review", caseKind: ["abstention"], reason: "In the zone and holding elements, but the code has no shot here: possible missed shot, so review." },
