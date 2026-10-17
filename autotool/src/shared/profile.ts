@@ -55,7 +55,6 @@ export const FACT_DEFAULTS: Omit<Fact, "status" | "source" | "confirmed">[] = [
   { key: "rampReachIn", label: "Ramp reach past the front edge (deployed)", value: 2, unit: "in", group: "robot", note: "same as the intake until the CAD gives the ramp length (R105: the ramp stays inside 18 x 24 in)" },
   { key: "rampOutS", label: "Ramp time, stowed to fully out", value: 0.55, unit: "s", group: "robot", note: "2 continuous servos wind the strings; AutoRunner runs them this long (program 4 times it from slow motion)" },
   { key: "rampInS", label: "Ramp time, fully out to stowed", value: 0.55, unit: "s", group: "robot", note: "program 4 times it from slow motion" },
-  { key: "rampHoldPower", label: "Ramp holding power while stowed", value: "not set", unit: "power", group: "robot", note: "keeps the stowed ramp up (gravity would let it sag into the field); shown only, AutoTool does not model it" },
   { key: "rampCarryS", label: "Ramp stays out into the next leg", value: 0.5, unit: "s", group: "auto", note: "AutoRunner folds the ramp this long after the next leg starts, so the robot backs out of the FLOWER first; Leg.carryRamp(s) sets it per leg" },
   { key: "elementsPerShot", label: "Elements one SHOOT sends", value: "all", unit: "", group: "shooter", note: "AutoRunner feeds for FEED_S with both gates open" },
   { key: "centerToFront", label: "Robot centre to front edge", value: 9, unit: "in", group: "robot" },

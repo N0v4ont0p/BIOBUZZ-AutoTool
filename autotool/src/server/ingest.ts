@@ -61,7 +61,6 @@ export function factsFromDigest(d: Digest, pack: SeasonPack): Record<string, Fac
   set("gateTravelS", fromConstant(d, "Tuned.gateTravelS", "E-8, the slowest gate servo"));
   set("rampOutS", fromConstant(d, "Tuned.rampOutS", "program 4, slow motion"));
   set("rampInS", fromConstant(d, "Tuned.rampInS", "program 4, slow motion"));
-  set("rampHoldPower", fromConstant(d, "Tuned.rampHoldPower", "program 4"));
   for (const [side, keyMin, keyMax] of [["back", "shotMinIn", "shotMaxIn"]] as const) {
     const t = d.shotTables[side];
     if (t.min !== null && t.max !== null) {
