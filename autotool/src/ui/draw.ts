@@ -1,11 +1,12 @@
-// Pure drawing math for the field view (no DOM). SVG space: x right, y DOWN, 0..144.
+// Pure drawing math for the field view (no DOM). SVG space: x right, y DOWN, 0..FIELD (141.17).
 // Field space: x right, y UP. The red view is the 180-degree rotation the robot code applies.
 
 import type { AutoFeatures, PathSample } from "../shared/features.ts";
 import { DEG } from "../shared/geometry.ts";
 import type { Leg } from "../shared/spec.ts";
 
-export const FIELD = 144;
+export { CENTER, FIELD } from "../shared/season.ts";
+import { FIELD } from "../shared/season.ts";
 
 export function sx(x: number, y: number, red: boolean): { x: number; y: number } {
   const fx = red ? FIELD - x : x;

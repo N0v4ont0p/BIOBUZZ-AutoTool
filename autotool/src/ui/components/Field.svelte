@@ -7,7 +7,7 @@
   import type { SeasonPack } from "../../shared/season.ts";
   import type { AutoSpec } from "../../shared/spec.ts";
   import fieldImage from "../../../../public/fields/biobuzz.webp";
-  import { annulus, carryStretch, chevrons, fromSvg, legLook, midpoint, pointsAttr, rectAttrs, svgAngle, sx, turnArc } from "../draw.ts";
+  import { CENTER, FIELD, annulus, carryStretch, chevrons, fromSvg, legLook, midpoint, pointsAttr, rectAttrs, svgAngle, sx, turnArc } from "../draw.ts";
   import { addLegAt, movePose, setHeading, splitLeg } from "../edit.ts";
   import { app } from "../state.svelte.ts";
 
@@ -145,7 +145,7 @@
   bind:this={svg}
   class="field"
   class:adding={app.mode === "add"}
-  viewBox="-3 -3 150 150"
+  viewBox="-3 -3 {FIELD + 6} {FIELD + 6}"
   role="application"
   aria-label="Field: route editor"
   onpointermove={onMove}
@@ -160,16 +160,16 @@
     <pattern id="zonehatch" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
       <line x1="0" y1="0" x2="0" y2="3" stroke="var(--zone)" stroke-width="0.35" />
     </pattern>
-    <clipPath id="farHalf"><rect x={red ? 0 : 72} y="0" width="72" height="72" /></clipPath>
-    <clipPath id="audHalf"><rect x={red ? 0 : 72} y="72" width="72" height="72" /></clipPath>
+    <clipPath id="farHalf"><rect x={red ? 0 : CENTER} y="0" width={CENTER} height={CENTER} /></clipPath>
+    <clipPath id="audHalf"><rect x={red ? 0 : CENTER} y={CENTER} width={CENTER} height={CENTER} /></clipPath>
     <marker id="arrow" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#fff" /></marker>
   </defs>
 
   <!-- the field never turns: as red, the route moves to the red side (reflected through the centre) -->
-  <image href={fieldImage} x="0" y="0" width="144" height="144" opacity="0.92" />
-  <rect x="0" y="0" width="144" height="144" fill="none" stroke="#000" stroke-width="0.6" />
+  <image href={fieldImage} x="0" y="0" width={FIELD} height={FIELD} preserveAspectRatio="none" opacity="0.92" />
+  <rect x="0" y="0" width={FIELD} height={FIELD} fill="none" stroke="#000" stroke-width="0.6" />
   <!-- alliance line (G402) -->
-  <line x1="72" y1="0" x2="72" y2="144" stroke="var(--mid)" stroke-width="0.35" stroke-dasharray="2 2" />
+  <line x1={CENTER} y1="0" x2={CENTER} y2={FIELD} stroke="var(--mid)" stroke-width="0.35" stroke-dasharray="2 2" />
 
   {#if app.showZones}
     {#each cells as c}

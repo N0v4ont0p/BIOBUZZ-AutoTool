@@ -52,11 +52,11 @@ test("geometry: bezier ends, line length, angle wrap", () => {
 });
 
 test("aim: robot facing the CELL needs ~0 deg of either turret; facing away is out of travel", () => {
-  const facing = solveAim({ x: 118, y: 90, headingDeg: 187.95 }, model);
+  const facing = solveAim({ x: 116.585, y: 88.585, headingDeg: 178.99 }, model);
   assert.ok(Math.abs(facing.frontYawDeg) < 1 && Math.abs(facing.backYawDeg) < 1, `front ${facing.frontYawDeg} back ${facing.backYawDeg}`);
   assert.equal(facing.cell, "far");
   assert.equal(facing.fires, "both");
-  const away = solveAim({ x: 118, y: 90, headingDeg: 7.95 }, model);
+  const away = solveAim({ x: 116.585, y: 88.585, headingDeg: -1.01 }, model);
   assert.equal(away.reachable, false);
   assert.equal(away.fires, "none");
 });
@@ -368,7 +368,7 @@ test("one file per auto: Blue and Red OpModes, AutoTool writes only between the 
   const again = writeAutoFile(custom, moved, n, null);
   assert.ok(again.includes("static int laps = 2;"));
   assert.ok(again.includes("poseFactory.of(126.0, 36.0, 180.0)"));
-  assert.equal(again.replace(/poseFactory\.of\(126\.0/, "poseFactory.of(128.0"), custom);
+  assert.equal(again.replace(/poseFactory\.of\(126\.0/, "poseFactory.of(125.17"), custom);
   // code put inside the markers would be lost on the next write: reading refuses it
   const stray = java.replace("        public Pose start() {", "        int extra = 1;\n\n        public Pose start() {");
   const bad = importAutoTool(stray, new Map());
@@ -407,7 +407,7 @@ test("reader: an AutoRunner route with helper methods, unset Tuned values, every
   }
 }`,
     },
-    { path: "MatchState.java", text: "public class MatchState {\n  public enum Alliance { BLUE, RED }\n  public static Alliance alliance = Alliance.BLUE;\n  public static PoseFactory poseFactory() { return alliance == Alliance.RED ? PoseFactory.degrees().mirrorAroundPoint(72, 72) : PoseFactory.degrees(); }\n}" },
+    { path: "MatchState.java", text: "public class MatchState {\n  public enum Alliance { BLUE, RED }\n  public static Alliance alliance = Alliance.BLUE;\n  public static PoseFactory poseFactory() { return alliance == Alliance.RED ? PoseFactory.degrees().mirrorAroundPoint(Field.CENTER, Field.CENTER) : PoseFactory.degrees(); }\n}" },
   ];
   const r = readAuto(files, "Route.java");
   assert.equal(r.framework, "AutoRunner legs");
@@ -572,8 +572,8 @@ test("features: a RAMP leg takes POLLEN from a FLOWER stack, an INTAKE leg does 
     const s = sampleSpec();
     s.preload.POLLEN = 0;
     const p = s.poses.find((x) => x.name === "shot1")!;
-    Object.assign(p, { x: 129, y: 96, headingDeg: 0 }); // 12.5 in from the F3 stack at (141.46, 96)
-    Object.assign(s.poses.find((x) => x.name === "start")!, { x: 110, y: 96, headingDeg: 0 }); // a straight approach
+    Object.assign(p, { x: 126.13, y: 93.17, headingDeg: 0 }); // 12.5 in from the F3 stack at (138.63, 93.17)
+    Object.assign(s.poses.find((x) => x.name === "start")!, { x: 110, y: 93.17, headingDeg: 0 }); // a straight approach
     s.legs[0] = { ...s.legs[0], during, end: "NONE" };
     const facts = defaultFacts();
     facts.rampReachIn.value = reachIn;
@@ -757,7 +757,7 @@ test("reach: a fixed launch angle scores only from far enough out; a SHOOT close
   assert.equal(f.junctions[0].zone.in, false);
   // farther out it scores
   const s = sampleSpec();
-  s.poses.find((p) => p.name === "shot1")!.x = 130;
+  s.poses.find((p) => p.name === "shot1")!.x = 127; // about 44 in out, back edge clear of the F3 foot
   const ok = computeFeatures(s, pack, m);
   assert.ok(!ok.problems.some((p) => p.code === "shot.reach" && p.where === "leg:L1"));
   assert.equal(ok.junctions[0].zone.in, true);
@@ -845,8 +845,8 @@ test("partner: two autos of one alliance run together; collisions, near misses, 
   const crossing: AutoSpec = {
     ...corner,
     poses: [
-      { name: "s", x: 135, y: 60, headingDeg: 180, role: "waypoint" },
-      { name: "e", x: 104, y: 24, headingDeg: 225, role: "waypoint" },
+      { name: "s", x: 132.17, y: 60, headingDeg: 180, role: "waypoint" },
+      { name: "e", x: 104, y: 21.17, headingDeg: 225, role: "waypoint" },
     ],
   };
   const opts = { ...DEFAULT_PARTNER, delayS: 11 };

@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { DURINGS, ENDS } from "../../shared/spec.ts";
 import { RUBRIC } from "../../shared/stops.ts";
 import { type Profile, profileContradictions } from "../../shared/profile.ts";
-import type { SeasonPack } from "../../shared/season.ts";
+import { CENTER, FIELD, type SeasonPack } from "../../shared/season.ts";
 import { fieldMap, nectarY } from "../../shared/fieldmap.ts";
 import { sha256 } from "../store.ts";
 import type { Digest } from "../digest.ts";
@@ -42,9 +42,9 @@ You are the route engineer of an FTC robot team: an expert in the BIOBUZZ field,
 const VOCAB = `# Vocabulary (one term per concept)
 | Term | Meaning | Units |
 |---|---|---|
-| field frame | origin at the red alliance wall / audience wall corner; x toward the blue wall, y toward the far wall; field is 144 x 144 | in |
+| field frame | origin at the red alliance wall / audience wall corner; x toward the blue wall, y toward the far wall; field is ${FIELD} x ${FIELD} (inside the wall rails) | in |
 | heading | direction the robot's front faces; 0 = +x, counter-clockwise positive | deg |
-| drawn side | autos are drawn for BLUE (x >= 72); red runs the 180-degree rotation of the same path | - |
+| drawn side | autos are drawn for BLUE (x >= ${CENTER}); red runs the 180-degree rotation of the same path | - |
 | leg | one path the robot follows, plus what it does while driving it (during) and when it gets there (end); the robot code's AutoRunner.Leg | - |
 | during | while driving the leg: NONE, INTAKE (the intake runs for the whole path), RAMP (intake + ramp out, POLLEN from a FLOWER bottom, G418) | - |
 | end | when the leg arrives: NONE (go straight on), SHOOT (hold, aim, fire), PARK (hold, the auto ends), WAIT (hold still waitS seconds; intake and ramp keep doing what they did while driving) | - |
@@ -69,7 +69,7 @@ Per leg, in route order (what a leg does changes the inventory for the legs afte
 
 For an edit:
 1. Restate what the team wants in field terms (which pose, which direction, which element or zone).
-2. Pick each new pose from the geometry: on the own side (x >= 72 as drawn), robot body clear of walls and no-go areas (centre at least the half-width from a wall unless the leg is meant to press into the wall to pick elements), for a shot: CELL distance inside the shot band and both turret angles inside their limits (or set the heading so the CELL is straight ahead: heading = bearing to the CELL).
+2. Pick each new pose from the geometry: on the own side (x >= ${CENTER} as drawn), robot body clear of walls and no-go areas (centre at least the half-width from a wall unless the leg is meant to press into the wall to pick elements), for a shot: CELL distance inside the shot band and both turret angles inside their limits (or set the heading so the CELL is straight ahead: heading = bearing to the CELL).
 3. Check the time: the route must finish before the abort time.
 4. Make the smallest set of ops that does it; decide every new or changed leg.`;
 
@@ -138,8 +138,8 @@ function packText(pack: SeasonPack): string {
 | own side | ${r(pack.allianceSide.BLUE)} | G304.A / G402 |
 | LOADING ZONE (park) | ${r(pack.loadingZone.BLUE)} | 9.3, 10.5.4 |
 | GARDEN | ${r(pack.garden.BLUE)} | 9.3 |
-| far CELL (y >= 72) | (${pack.cells.BLUE.far.x}, ${pack.cells.BLUE.far.y}) | 9.6 |
-| audience CELL (y < 72) | (${pack.cells.BLUE.audience.x}, ${pack.cells.BLUE.audience.y}) | 9.6 |
+| far CELL (y >= ${CENTER}) | (${pack.cells.BLUE.far.x}, ${pack.cells.BLUE.far.y}) | 9.6 |
+| audience CELL (y < ${CENTER}) | (${pack.cells.BLUE.audience.x}, ${pack.cells.BLUE.audience.y}) | 9.6 |
 | HIVE frame bars (no-go) | ${pack.obstacles.filter((o) => o.id.startsWith("hive")).map((o) => r(o.rect)).join("; ")} | 9.6 |
 | FLOWER feet (no-go) | ${pack.flowers.map((f) => `${f.id} ${r(f.foot)}`).join("; ")} | 9.7 |
 
@@ -172,15 +172,15 @@ function geometryText(pack: SeasonPack, p: Profile): string {
   const v = (k: string) => p.facts[k]?.value;
   const unit = (k: string, u: string) => (typeof v(k) === "number" ? `${v(k)} ${u}` : "not set");
   const ny = nectarY(pack);
-  const nearHalf = ny >= 72 ? "y >= 72" : "y < 72";
+  const nearHalf = ny >= CENTER ? `y >= ${CENTER}` : `y < ${CENTER}`;
   const bars = pack.obstacles.filter((o) => o.id.startsWith("hive")).map((o) => `x ${o.rect.x0}-${o.rect.x1}, y ${o.rect.y0}-${o.rect.y1}`);
   return `# Field geometry (season pack; drawn for BLUE)
 \`\`\`
 ${fieldMap(pack)}
 \`\`\`
-- Frame: the field is 144 x 144 in. Origin at the red ALLIANCE wall / audience wall corner; x grows toward the blue ALLIANCE wall, y toward the far (rear) wall. Heading 0 deg = facing +x, 90 = +y, 180 = -x, -90 = -y.
-- Sides: x >= 72 is BLUE (the drawn, own side); x < 72 is the opponent's. RED runs the 180-degree rotation (x, y, h) -> (144 - x, 144 - y, h + 180), so everything below holds for both alliances.
-- HIVE: in the middle of the field. Its frame bars are no-go walls (${bars.join("; ")}). It has two CELLs per alliance; on the BLUE side the far CELL is at (${pack.cells.BLUE.far.x}, ${pack.cells.BLUE.far.y}) and the audience CELL at (${pack.cells.BLUE.audience.x}, ${pack.cells.BLUE.audience.y}). The robot aims at its own CELL on its side of y = 72.
+- Frame: the field is ${FIELD} x ${FIELD} in (inside the wall rails; the manual's 144 is nominal). Origin at the red ALLIANCE wall / audience wall corner; x grows toward the blue ALLIANCE wall, y toward the far (rear) wall. Heading 0 deg = facing +x, 90 = +y, 180 = -x, -90 = -y.
+- Sides: x >= ${CENTER} is BLUE (the drawn, own side); x < ${CENTER} is the opponent's. RED runs the 180-degree rotation (x, y, h) -> (${FIELD} - x, ${FIELD} - y, h + 180), so everything below holds for both alliances.
+- HIVE: in the middle of the field. Its frame bars are no-go walls (${bars.join("; ")}). It has two CELLs per alliance; on the BLUE side the far CELL is at (${pack.cells.BLUE.far.x}, ${pack.cells.BLUE.far.y}) and the audience CELL at (${pack.cells.BLUE.audience.x}, ${pack.cells.BLUE.audience.y}). The robot aims at its own CELL on its side of y = ${CENTER}.
 - NECTAR: the BLUE ${pack.cells.upAtStart.BLUE} CELL (y = ${ny}) holds 3 NECTAR at the start; 3 POLLEN tip it for HIVE TIP (20 points).
 - Near / Far: the Near half is the half with the NECTAR CELL (${nearHalf}); the Far half is the other one. An auto is named by the half it starts in (Blue_Near, Red_Far, ...).
 - Staged POLLEN on the floor: the blue GARDEN row along the far wall (${pack.staged.filter((e) => e.access === "floor" && e.where.startsWith("blue")).map((e) => `(${e.x}, ${e.y})`).join(", ")}); pick them by driving the intake end along y close to the far wall. FLOWER stacks never count in the inventory (a RAMP leg may still take them; the team decides).

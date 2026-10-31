@@ -13,7 +13,7 @@ import { computeFeatures, solveAim } from "../src/shared/features.ts";
 import { DEG, wrapDeg } from "../src/shared/geometry.ts";
 import { decideStop, legKey, stopKey } from "../src/shared/stops.ts";
 import { defaultFacts, robotModel } from "../src/shared/profile.ts";
-import type { SeasonPack } from "../src/shared/season.ts";
+import { CENTER, FIELD, type SeasonPack } from "../src/shared/season.ts";
 import { type AutoSpec, type During, type End, type Leg, type PoseDef, cloneSpec, withStop } from "../src/shared/spec.ts";
 
 const here = new URL(".", import.meta.url).pathname;
@@ -64,9 +64,9 @@ function leg(i: number, from: string, to: string, intent: Intent | null): Leg {
 
 function legalStart(rand: () => number): PoseDef {
   const opts = [
-    () => pose("start", 135, 60 + rand() * 23, 180), // right wall, below F3 (footprint clear of its foot)
-    () => pose("start", 135, 106 + rand() * 24, 180), // right wall, above F3
-    () => pose("start", 106 + rand() * 12, 135, -90), // rear wall right of the HIVE frame bar, facing the audience
+    () => pose("start", FIELD - 9, 57.17 + rand() * 23, 180), // right wall, below F3 (footprint clear of its foot)
+    () => pose("start", FIELD - 9, 103.17 + rand() * 24, 180), // right wall, above F3
+    () => pose("start", 106 + rand() * 12, FIELD - 9, -90), // rear wall right of the HIVE frame bar, facing the audience
     () => pose("start", 106 + rand() * 18, 9, 90), // audience wall, right of F4
   ];
   return opts[Math.floor(rand() * opts.length)]();
@@ -83,8 +83,8 @@ function shotPose(name: string, rand: () => number, far: boolean): PoseDef {
     const bearing = Math.atan2(cell.y - y, cell.x - x) / DEG;
     const h = bearing + (rand() - 0.5) * 100; // turret command within about +-50 deg
     const p = pose(name, x, y, h);
-    // right of the blue HIVE frame bar (x 96-97) with the 18 in footprint clear of it, inside the walls
-    if (x < 108 || x > 133 || y < 11 || y > 133 || (far && y < 74) || (!far && y >= 70)) continue;
+    // right of the blue HIVE frame bar (x 94.6-95.6) with the 18 in footprint clear of it, inside the walls
+    if (x < 108 || x > FIELD - 11 || y < 11 || y > FIELD - 11 || (far && y < CENTER + 2) || (!far && y >= CENTER - 2)) continue;
     const a = solveAim({ x: p.x!, y: p.y!, headingDeg: p.headingDeg! }, model);
     if (a.reachable && a.backDistIn > model.shotMinIn + 2 && a.backDistIn < model.shotMaxIn - 2) return p;
   }
@@ -114,8 +114,8 @@ function build(plan: Block[], rand: () => number, name: string): AutoSpec {
       case "GARDEN": {
         if (gardenDone) break;
         gardenDone = true;
-        add(pose(`gardenIn${n + 1}`, 104 + rand() * 10, 134.5, 0), MOVE);
-        const end = pose(`gardenEnd${n + 1}`, 133 + rand() * 1.5, 134.5, 0);
+        add(pose(`gardenIn${n + 1}`, 104 + rand() * 10, FIELD - 9.5, 0), MOVE);
+        const end = pose(`gardenEnd${n + 1}`, FIELD - 11 + rand() * 1.5, FIELD - 9.5, 0);
         poses.push(end);
         n++;
         const l = leg(n, prev, end.name, INTAKE);
@@ -129,7 +129,7 @@ function build(plan: Block[], rand: () => number, name: string): AutoSpec {
       case "REPOSITION": {
         // out of the zone: too close to a CELL, or facing away
         const close = rand() < 0.5;
-        const p = close ? pose(`move${n + 1}`, 108 + rand() * 3, 72 + (rand() - 0.5) * 6, 180) : pose(`move${n + 1}`, 118 + rand() * 10, 30 + rand() * 30, rand() < 0.5 ? 0 : 20);
+        const p = close ? pose(`move${n + 1}`, 108 + rand() * 3, CENTER + (rand() - 0.5) * 6, 180) : pose(`move${n + 1}`, 118 + rand() * 10, 30 + rand() * 30, rand() < 0.5 ? 0 : 20);
         add(p, MOVE);
         break;
       }
@@ -141,7 +141,7 @@ function build(plan: Block[], rand: () => number, name: string): AutoSpec {
         break;
       }
       case "PARK":
-        add(pose("park", 121 + rand() * 6, 30 + rand() * 14, 180 + (rand() - 0.5) * 30), PARK);
+        add(pose("park", FIELD - 23 + rand() * 6, 27.17 + rand() * 14, 180 + (rand() - 0.5) * 30), PARK);
         break;
     }
   }
@@ -289,10 +289,10 @@ export function generate(seed = 19859, perPlan = 10): EvalCase[] {
         const p1 = cloneSpec(s);
         const pn = p1.legs[shotLeg].path.to;
         const pp = p1.poses.find((p) => p.name === pn)!;
-        const cell = pp.y! >= 72 ? pack.cells.BLUE.far : pack.cells.BLUE.audience;
+        const cell = pp.y! >= CENTER ? pack.cells.BLUE.far : pack.cells.BLUE.audience;
         // move it next to the CELL: closer than the shortest shot
         pp.x = r1(cell.x + 14);
-        pp.y = r1(cell.y + (pp.y! >= 72 ? 4 : -4));
+        pp.y = r1(cell.y + (pp.y! >= CENTER ? 4 : -4));
         const c1 = mk("perturbed", `${base}_out`, "a shot endpoint moved out of the zone (too close to the CELL)", strip(p1));
         if (c1 && !c1.expected[s.legs[shotLeg].id].some((k) => k.endsWith("/SHOOT"))) cases.push({ ...c1, mustNot: { [s.legs[shotLeg].id]: ["SHOOT"] } });
 

@@ -3,6 +3,7 @@
 // cannot represent is reported, never silently dropped.
 
 import { DEG, angleErrorDeg, bezierDeriv, throughToBeziers, wrapDeg } from "./geometry.ts";
+import { FIELD } from "./season.ts";
 import { type AutoSpec, type HeadingDef, type Leg, type PoseDef, SPEC_VERSION, uniqueName } from "./spec.ts";
 
 interface PpPoint {
@@ -70,7 +71,7 @@ export function importVisualizerProject(json: unknown, name = "drawn"): { spec?:
   const errors: string[] = [];
   const doc = json as PpProject;
   if (!doc || typeof doc !== "object" || !doc.startPoint || !Array.isArray(doc.lines)) return { warnings, errors: ["not a visualizer project: needs startPoint and lines"] };
-  warnings.push("The stock visualizer draws on a 141.5 in field image; AutoTool draws on 144 in (the manual, the robot code). The numbers are kept exactly as drawn, so points near the far walls can look up to 2.5 in off on this field image.");
+  warnings.push(`The stock visualizer draws on a 141.5 in field image; AutoTool draws on ${FIELD} in (inside the wall rails, the robot code). The numbers are kept exactly as drawn, so points near the far walls can look about 0.3 in off on this field image.`);
   // order: the sequence when present, else the lines
   const byId = new Map(doc.lines.map((l) => [l.id ?? "", l]));
   let ordered: PpPath[] = doc.lines;

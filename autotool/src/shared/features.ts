@@ -31,7 +31,7 @@ import {
   wrapDeg,
 } from "./geometry.ts";
 import type { RobotModel } from "./profile.ts";
-import type { SeasonPack, StagedElement } from "./season.ts";
+import { CENTER as MID, FIELD, type SeasonPack, type StagedElement } from "./season.ts";
 import { type AutoSpec, type During, type End, type Problem, startPoseName } from "./spec.ts";
 
 export interface PathSample extends Sample {
@@ -288,8 +288,6 @@ interface ResolvedPose {
   h: number;
 }
 
-const FIELD = 144;
-const MID = 72;
 
 function resolve(spec: AutoSpec): Map<string, ResolvedPose | null> {
   const out = new Map<string, ResolvedPose | null>();
@@ -558,7 +556,7 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
       preloadFour: spec.preload.POLLEN === pack.rules.preload.POLLEN,
     };
     const g304: [keyof StartCheck, string][] = [
-      ["ownSide", "G304.A: the start footprint is not fully on the blue side (x >= 72)"],
+      ["ownSide", `G304.A: the start footprint is not fully on the blue side (x >= ${MID})`],
       ["insideField", "G304.A: the start footprint is outside the field"],
       ["touchingWall", "G304.C: the robot must start touching the perimeter wall"],
       ["clearOfFlowers", "G304.D: the start footprint touches a FLOWER"],
@@ -764,7 +762,7 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
       });
     }
     if (lf.centreCrossesMid) problems.push({ level: "warning", code: "rule.G402", where: `leg:${leg.id}`, message: "the robot centre crosses onto the red side during AUTO (G402: risky, may be STRATEGIC)" });
-    else if (lf.footprintCrossesMid) problems.push({ level: "warning", code: "rule.G402", where: `leg:${leg.id}`, message: "part of the robot crosses x = 72 onto the red side during AUTO (G402)" });
+    else if (lf.footprintCrossesMid) problems.push({ level: "warning", code: "rule.G402", where: `leg:${leg.id}`, message: `part of the robot crosses x = ${MID} onto the red side during AUTO (G402)` });
     if (lf.flowerReached.length) problems.push({ level: "warning", code: "inventory.flower", where: `leg:${leg.id}`, message: `the intake reaches FLOWER ${lf.flowerReached.join(", ")}: POLLEN only come out of the FLOWER bottom with the ramp, and only a RAMP leg deploys it (unconfirmed, not counted)` });
     if (lf.intakeLeads === false) problems.push({ level: "warning", code: "geometry.intakeLeads", where: `leg:${leg.id}`, message: `the intake does not lead: up to ${round(lf.intakeLeadWorstDeg ?? 0, 0)} deg off the direction of travel` });
 

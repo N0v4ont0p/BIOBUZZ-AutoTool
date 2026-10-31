@@ -1,12 +1,13 @@
 // Route edits made by hand in the field view. Pure functions: spec in, new spec out.
 
 import { DEG, round, wrapDeg } from "../shared/geometry.ts";
+import { FIELD } from "../shared/season.ts";
 import { fVars, solveFor } from "../shared/java/reader.ts";
 import { applyAssumptions } from "../shared/readspec.ts";
 import { type AutoSpec, type During, type End, type Leg, type PoseDef, cloneSpec, nextLegId, renumberLegs, uniqueName, withStop } from "../shared/spec.ts";
 
 const snap = (v: number, fine: boolean) => (fine ? round(v, 1) : Math.round(v * 2) / 2);
-const clampField = (v: number) => Math.max(0, Math.min(144, v));
+const clampField = (v: number) => Math.max(0, Math.min(FIELD, v));
 
 // A pose read from code that hangs on unknowns (Tuned values not set yet): moving it sets those
 // unknowns, so every pose computed from them (along(0.25), ...) moves with it. null = not that kind.

@@ -1,6 +1,8 @@
 // The auto spec: the single source of truth. The route UI edits it, the AI proposes patches to it,
 // the generator turns it into Java. Poses are named (they become Java fields); legs reference them.
 
+import { FIELD } from "./season.ts";
+
 export const SPEC_VERSION = 2;
 
 // A leg is the robot code's AutoRunner.Leg, field for field: a path (or a target pose), what the robot does
@@ -237,7 +239,7 @@ export interface Problem {
 }
 
 // Schema, reference and adapter checks. Errors block writing; warnings are shown.
-export function validateSpec(spec: AutoSpec, opts: { fieldSize: number } = { fieldSize: 144 }): Problem[] {
+export function validateSpec(spec: AutoSpec, opts: { fieldSize: number } = { fieldSize: FIELD }): Problem[] {
   const out: Problem[] = [];
   const err = (code: string, where: string, message: string) => out.push({ level: "error", code, where, message });
   const warn = (code: string, where: string, message: string) => out.push({ level: "warning", code, where, message });

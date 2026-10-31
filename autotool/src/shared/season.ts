@@ -2,6 +2,11 @@ import type { Rect, Vec } from "./geometry.ts";
 
 export type Alliance = "BLUE" | "RED";
 
+// Field frame size: inside the wall rails (AndyMark field CAD, TeamCode config/Field.SIZE), not the manual's nominal 144.
+// The season pack's frame.sizeIn must equal it. Red is the 180-degree rotation about (CENTER, CENTER).
+export const FIELD = 141.17;
+export const CENTER = FIELD / 2;
+
 export interface StagedElement {
   id: string;
   type: "POLLEN" | "NECTAR";
@@ -52,7 +57,7 @@ export function validatePack(p: SeasonPack): string[] {
   const out: string[] = [];
   if (!p || typeof p !== "object") return ["pack is not an object"];
   if (!p.manual?.version) out.push("pack does not name the manual version it came from");
-  if (p.frame?.sizeIn !== 144) out.push("pack frame size is not 144 in");
+  if (p.frame?.sizeIn !== FIELD) out.push(`pack frame size is not ${FIELD} in`);
   const sc = p.scoring;
   if (!(sc?.LEAVE?.auto >= 0 && sc?.PARK?.auto >= 0 && sc?.HIVE_TIP?.auto >= 0)) out.push("pack scoring has no LEAVE / PARK / HIVE TIP AUTO points");
   if (!Array.isArray(sc?.tipPollenByNectar?.table) || sc.tipPollenByNectar.table.length < 4) out.push("pack scoring has no POLLEN-to-tip table");
@@ -61,7 +66,7 @@ export function validatePack(p: SeasonPack): string[] {
     if (!p.cells?.[a]?.far || !p.cells?.[a]?.audience) out.push(`no ${a} CELLs`);
   }
   // the layout must be a 180-degree rotation, never a mirror
-  const s = p.frame?.sizeIn ?? 144;
+  const s = p.frame?.sizeIn ?? FIELD;
   const rot = (v: Vec) => ({ x: s - v.x, y: s - v.y });
   const close = (a: Vec, b: Vec) => Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01;
   if (p.cells && !(close(rot(p.cells.RED.far), p.cells.BLUE.audience) && close(rot(p.cells.RED.audience), p.cells.BLUE.far))) {
@@ -74,7 +79,7 @@ export function validatePack(p: SeasonPack): string[] {
   return out;
 }
 
-export function rotate180(v: Vec, size = 144): Vec {
+export function rotate180(v: Vec, size = FIELD): Vec {
   return { x: size - v.x, y: size - v.y };
 }
 

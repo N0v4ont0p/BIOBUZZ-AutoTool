@@ -9,7 +9,7 @@
   import type { AutoSpec } from "../../shared/spec.ts";
   import fieldImage from "../../../../public/fields/biobuzz.webp";
   import { api, uiSetting } from "../api.ts";
-  import { pointsAttr, sx } from "../draw.ts";
+  import { FIELD, pointsAttr, sx } from "../draw.ts";
   import { app } from "../state.svelte.ts";
 
   interface Col {
@@ -210,7 +210,7 @@
   // a pose as the robot is placed for our alliance (red: turned 180 degrees about the field centre)
   function onSide(p: { x: number | null; y: number | null; headingDeg: number | null } | undefined) {
     if (!p || p.x === null || p.y === null || p.headingDeg === null) return "not set";
-    const [x, y, h] = red ? [144 - p.x, 144 - p.y, wrap(p.headingDeg + 180)] : [p.x, p.y, wrap(p.headingDeg)];
+    const [x, y, h] = red ? [FIELD - p.x, FIELD - p.y, wrap(p.headingDeg + 180)] : [p.x, p.y, wrap(p.headingDeg)];
     return `x ${x.toFixed(1)}, y ${y.toFixed(1)}, heading ${h.toFixed(0)}°`;
   }
   const startOf = (s: AutoSpec) => s.poses.find((p) => p.name === s.start);
@@ -326,8 +326,8 @@
       </header>
 
       <div class="cols">
-        <svg class="mini" viewBox="-2 -2 148 148" aria-label="Both routes on the field">
-          <image href={fieldImage} x="0" y="0" width="144" height="144" opacity="0.85" />
+        <svg class="mini" viewBox="-2 -2 {FIELD + 4} {FIELD + 4}" aria-label="Both routes on the field">
+          <image href={fieldImage} x="0" y="0" width={FIELD} height={FIELD} preserveAspectRatio="none" opacity="0.85" />
           {#each c.tf.geometry as g}{#if g.drawable}<polyline points={pointsAttr(g.samples, red)} class="pr" />{/if}{/each}
           {#each c.of.geometry as g}{#if g.drawable}<polyline points={pointsAttr(g.samples, red)} class="ur" />{/if}{/each}
           {#if pose3(startOf(c.os))}<polygon points={fp(pose3(startOf(c.os))!, app.model!.body)} class="us" />{/if}

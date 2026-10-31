@@ -1,6 +1,7 @@
 // Actions shared by the panels and the keyboard: AI turns, approve/reject, write, undo.
 
 import type { ClaimResult, Patch } from "../shared/patch.ts";
+import { CENTER, FIELD } from "../shared/season.ts";
 import type { AutoSpec } from "../shared/spec.ts";
 import { ApiError, api, apiStream } from "./api.ts";
 import { type CompileInfo, app } from "./state.svelte.ts";
@@ -194,9 +195,9 @@ export async function blankAuto() {
     start: "start",
     preload: { POLLEN: 4, NECTAR: 0, onTiles: 0 },
     poses: [
-      { name: "start", x: 135, y: 72, headingDeg: 180, ...w },
+      { name: "start", x: FIELD - 9, y: CENTER, headingDeg: 180, ...w },
       { name: "shot1", x: 118, y: 90, headingDeg: 180, ...w },
-      { name: "park", x: 128, y: 36, headingDeg: 180, ...w },
+      { name: "park", x: FIELD - 16, y: 36, headingDeg: 180, ...w },
     ],
     legs: [leg("L1", "start", "shot1", "SHOOT"), leg("L2", "shot1", "park", "PARK")],
     opaque: [],

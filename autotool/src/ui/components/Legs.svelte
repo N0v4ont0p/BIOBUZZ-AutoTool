@@ -10,7 +10,7 @@
   import { autoPoints } from "../../shared/points.ts";
   import { decideStop, legKey, stopKey } from "../../shared/stops.ts";
   import { api } from "../api.ts";
-  import { evidenceLine } from "../draw.ts";
+  import { CENTER, FIELD, evidenceLine } from "../draw.ts";
   import { addControl, appendStop, insertStopBefore, moveStop, placePose, removeControl, renamePose, setOption, setStop, straighten } from "../edit.ts";
   import { app } from "../state.svelte.ts";
 
@@ -88,7 +88,7 @@
   }
 
   // ---- the stop's pose, shape and heading ----
-  const flip = (k: "x" | "y" | "headingDeg", v: number) => (k === "headingDeg" ? ((((v + 180 + 180) % 360) + 360) % 360) - 180 : 144 - v);
+  const flip = (k: "x" | "y" | "headingDeg", v: number) => (k === "headingDeg" ? ((((v + 180 + 180) % 360) + 360) % 360) - 180 : FIELD - v);
   function disp(p: { x: number | null; y: number | null; headingDeg: number | null }, k: "x" | "y" | "headingDeg"): number | "" {
     const v = p[k];
     if (v === null) return "";
@@ -102,7 +102,7 @@
       ...s,
       poses: s.poses.map((p) => {
         if (p.name !== name) return p;
-        const q = { ...p, [k]: k === "headingDeg" ? n : Math.max(0, Math.min(144, n)) };
+        const q = { ...p, [k]: k === "headingDeg" ? n : Math.max(0, Math.min(FIELD, n)) };
         const ek = k === "headingDeg" ? "h" : k;
         if (q.expr?.[ek]) {
           const e = { ...q.expr };
@@ -135,7 +135,7 @@
   function place(name: string) {
     const isStart = name === spec.start;
     const isLastStop = spec.legs.at(-1)?.path.to === name;
-    const d = isStart ? { x: 135, y: 72, h: 180 } : isLastStop ? { x: 128, y: 36, h: 180 } : { x: 110, y: 72, h: 180 };
+    const d = isStart ? { x: FIELD - 9, y: CENTER, h: 180 } : isLastStop ? { x: FIELD - 16, y: 36, h: 180 } : { x: 110, y: CENTER, h: 180 };
     if (spec.poses.find((p) => p.name === name)?.formula) {
       api<{ spec: AutoSpec; solved: string[] }>("POST", "/api/autos/assume", { name: spec.name, pose: name, x: d.x, y: d.y, h: d.h })
         .then((r) => {

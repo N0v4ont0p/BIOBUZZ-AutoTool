@@ -5,8 +5,8 @@ only: the robot repo is never touched. The robot gets the tuned values the setup
 auto's start pose, and the auto runs like on the Driver Station. Prints one JSON line: what each leg did, where the
 robot ended, and anything that went wrong.
 
-    python3 check_auto.py --repo <robot repo> --file <Near_9.java> --opmode Blue_Near_9 --start 135,72,180 \
-        [--alliance BLUE|RED] [--remove Blue_Near_9.java,Red_Near_9.java] [--park 128,36]
+    python3 check_auto.py --repo <robot repo> --file <Near_9.java> --opmode Blue_Near_9 --start 132.17,70.585,180 \
+        [--alliance BLUE|RED] [--remove Blue_Near_9.java,Red_Near_9.java] [--park 125.17,36]
 """
 import argparse
 import json
@@ -37,13 +37,14 @@ from harness import running_sim  # noqa: E402
 from launcher_student import tuned_robot  # noqa: E402
 
 red = a.alliance.upper() == "RED"
+FIELD = 141.17  # inside the wall rails: TeamCode config/Field.SIZE, AutoTool src/shared/season.ts FIELD
 
 
 def as_alliance(x, y, h=None):
     # red runs the drawn route turned 180 degrees about the field centre (MatchState.poseFactory)
     if not red:
         return (x, y, h)
-    return (144 - x, 144 - y, None if h is None else h + 180)
+    return (FIELD - x, FIELD - y, None if h is None else h + 180)
 
 
 out = {"ok": False, "opmode": a.opmode, "alliance": "RED" if red else "BLUE", "legs": [], "events": [], "status": None, "end": None}

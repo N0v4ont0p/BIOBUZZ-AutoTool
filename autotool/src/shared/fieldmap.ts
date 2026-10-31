@@ -4,31 +4,32 @@
 
 import type { AutoFeatures } from "./features.ts";
 import type { Rect } from "./geometry.ts";
-import type { SeasonPack } from "./season.ts";
+import { CENTER, FIELD, type SeasonPack } from "./season.ts";
 
-// "Near" = the half of the field (split at y = 72) with the HIVE CELL that holds the NECTAR at the
+// "Near" = the half of the field (split at y = CENTER) with the HIVE CELL that holds the NECTAR at the
 // start (the staged up-CELL). Autos are drawn for BLUE; red is the 180-degree rotation, which keeps
 // the same half, so one auto is Near or Far for both alliances.
 export function nectarY(pack: SeasonPack): number {
   return pack.cells.BLUE[pack.cells.upAtStart.BLUE].y;
 }
 export function sideOf(y: number, pack: SeasonPack): "Near" | "Far" {
-  return y >= 72 === nectarY(pack) >= 72 ? "Near" : "Far";
+  return y >= CENTER === nectarY(pack) >= CENTER ? "Near" : "Far";
 }
 
-const COLS = 48; // 3 in per column
-const ROWS = 24; // 6 in per row (text characters are about twice as tall as wide)
+// ponytail: 3 x 6 in characters on the non-integer field; the last column / bottom row run a little past the walls
+const COLS = Math.ceil(FIELD / 3); // 3 in per column
+const ROWS = Math.ceil(FIELD / 6); // 6 in per row (text characters are about twice as tall as wide)
 const SYMBOLS = "123456789abcdefghijklmnopqrstuvwxyz";
 
 export function fieldMap(pack: SeasonPack, f?: AutoFeatures | null): string {
   const g: string[][] = Array.from({ length: ROWS }, () => Array(COLS).fill("."));
   const col = (x: number) => Math.min(COLS - 1, Math.max(0, Math.floor(x / 3)));
-  const row = (y: number) => Math.min(ROWS - 1, Math.max(0, Math.floor((144 - y) / 6)));
+  const row = (y: number) => Math.min(ROWS - 1, Math.max(0, Math.floor((FIELD - y) / 6)));
   const put = (x: number, y: number, ch: string) => (g[row(y)][col(x)] = ch);
   const fill = (r: Rect, ch: string) => {
     for (let y = r.y0; y <= r.y1; y += 1) for (let x = r.x0; x <= r.x1; x += 1) put(x, y, ch);
   };
-  for (let r = 0; r < ROWS; r++) g[r][col(72)] = ":";
+  for (let r = 0; r < ROWS; r++) g[r][col(CENTER)] = ":";
   for (const a of ["BLUE", "RED"] as const) {
     fill(pack.loadingZone[a], a === "BLUE" ? "L" : "l");
     fill(pack.garden[a], a === "BLUE" ? "G" : "g");
@@ -47,15 +48,15 @@ export function fieldMap(pack: SeasonPack, f?: AutoFeatures | null): string {
     if (s0) put(s0.x, s0.y, "S");
     f.junctions.forEach((j, i) => put(j.pose.x, j.pose.y, SYMBOLS[i] ?? "#"));
   }
-  const lines = g.map((r, i) => `${String(Math.round(144 - i * 6)).padStart(3)} |${r.join("")}|`);
+  const lines = g.map((r, i) => `${String(Math.round(FIELD - i * 6)).padStart(3)} |${r.join("")}|`);
   const ticks = `     ${Array.from({ length: COLS }, (_, c) => (c % 8 === 0 ? String(c * 3).padEnd(8) : "")).join("")}`.trimEnd();
   return [
-    "y (in)  far (rear) wall at y = 144",
+    `y (in)  far (rear) wall at y = ${FIELD}`,
     ...lines,
     `     ${"-".repeat(COLS)}`,
     `${ticks}   x (in)`,
-    "x = 0 is the red ALLIANCE wall, x = 144 the blue ALLIANCE wall, y = 0 the audience wall. One character = 3 in wide x 6 in tall.",
-    `Legend: ':' x = 72 (alliance line; BLUE side is x >= 72) | H HIVE frame bar (no-go) | N CELL holding NECTAR at the start | C other CELL | F FLOWER foot (no-go) | L/l blue/red LOADING ZONE | G/g blue/red GARDEN | p staged POLLEN${f?.drawable ? " | S start | 1-9,a-z junctions L1, L2, ... | * path" : ""}`,
+    `x = 0 is the red ALLIANCE wall, x = ${FIELD} the blue ALLIANCE wall, y = 0 the audience wall. One character = 3 in wide x 6 in tall.`,
+    `Legend: ':' x = ${CENTER} (alliance line; BLUE side is x >= ${CENTER}) | H HIVE frame bar (no-go) | N CELL holding NECTAR at the start | C other CELL | F FLOWER foot (no-go) | L/l blue/red LOADING ZONE | G/g blue/red GARDEN | p staged POLLEN${f?.drawable ? " | S start | 1-9,a-z junctions L1, L2, ... | * path" : ""}`,
   ].join("\n");
 }
 
@@ -72,7 +73,7 @@ export function routeWords(pack: SeasonPack, f: AutoFeatures): string {
   const s0 = f.geometry[0]?.samples[0];
   if (s0) out.push(`start (${Math.round(s0.x * 10) / 10}, ${Math.round(s0.y * 10) / 10}) heading ${Math.round(s0.headingDeg)}: ${sideOf(s0.y, pack)} half; faces ${headingWords(s0.headingDeg)}.`);
   for (const j of f.junctions) {
-    const where: string[] = [`${sideOf(j.pose.y, pack)} half`, j.pose.x >= 72 ? "own side" : "OPPONENT side"];
+    const where: string[] = [`${sideOf(j.pose.y, pack)} half`, j.pose.x >= CENTER ? "own side" : "OPPONENT side"];
     if (j.inLoadingZone) where.push("in the LOADING ZONE");
     if (j.wallClearanceIn < 2) where.push("against a wall");
     if (j.onCluster) where.push("on staged elements");
