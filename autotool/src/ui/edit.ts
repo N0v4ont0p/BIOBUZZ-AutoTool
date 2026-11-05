@@ -5,6 +5,7 @@ import { FIELD } from "../shared/season.ts";
 import { fVars, solveFor } from "../shared/java/reader.ts";
 import { applyAssumptions } from "../shared/readspec.ts";
 import { type AutoSpec, type During, type End, type Leg, type PoseDef, cloneSpec, nextLegId, renumberLegs, uniqueName, withStop } from "../shared/spec.ts";
+import type { AutoFeatures } from "../shared/features.ts";
 
 const snap = (v: number, fine: boolean) => (fine ? round(v, 1) : Math.round(v * 2) / 2);
 const clampField = (v: number) => Math.max(0, Math.min(FIELD, v));
@@ -234,6 +235,42 @@ export function setStop(spec: AutoSpec, legId: string, during: During, end: End)
   if (i < 0) return spec;
   s.legs[i] = withStop(s.legs[i], during, end, "user", s.legs[i].junction.evidence);
   return s;
+}
+
+// SHOOT legs (team 2026-11-05): .keepHeading() (no INIT turn for the turret) and .bothTurrets() (turn so both reach)
+export function setShotFlag(spec: AutoSpec, legId: string, key: "keepHeading" | "bothTurrets", on: boolean): AutoSpec {
+  const s = cloneSpec(spec);
+  const l = s.legs.find((x) => x.id === legId);
+  if (!l || l.end !== "SHOOT") return spec;
+  if (on) l[key] = true;
+  else delete l[key];
+  return s;
+}
+
+// Draws each SHOOT leg at the heading AutoRunner would turn it to at INIT (features' headingFixDeg), so the code says
+// what the robot does. Only an end pose whose heading AutoTool owns: the leg heads linearly to it (or drives straight
+// to it), and the pose is a plain number. Anything else is left for the robot to turn at INIT, and named.
+// The turn is rounded up to 0.1 deg away from the drawn heading, so the margin is never rounded away.
+export function fixShotHeadings(spec: AutoSpec, features: AutoFeatures): { spec: AutoSpec; fixed: string[]; left: string[] } {
+  const s = cloneSpec(spec);
+  const fixed: string[] = [];
+  const left: string[] = [];
+  for (const leg of s.legs) {
+    if (leg.end !== "SHOOT") continue;
+    const j = features.junctions.find((x) => x.id === leg.id);
+    const turn = j?.target.headingFixDeg ?? 0;
+    if (!j || turn === 0) continue;
+    const owns = (leg.heading.mode === "linear" && leg.heading.to === leg.path.to) || leg.heading.mode === "toTarget";
+    const pose = s.poses.find((p) => p.name === leg.path.to);
+    if (!owns || !pose || pose.headingDeg === null || pose.formula || pose.expr?.h) {
+      left.push(`${leg.id}: the robot turns it ${round(turn, 1)} deg at INIT (its heading is not a plain number AutoTool draws)`);
+      continue;
+    }
+    const up = Math.sign(turn) * Math.ceil(Math.abs(turn) * 10 - 1e-9) / 10;
+    pose.headingDeg = wrapDeg(round(j.headingInDeg + up, 1));
+    fixed.push(`${leg.id} ${up > 0 ? "+" : ""}${up.toFixed(1)} deg`);
+  }
+  return { spec: s, fixed, left };
 }
 
 // One leg option: timeout, carryIntake, carryRamp, shotTimeout or the WAIT time. null = AutoRunner's default.

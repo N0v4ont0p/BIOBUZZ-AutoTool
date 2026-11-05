@@ -64,10 +64,17 @@ export function digestFile(file: string, text: string): FileDigest {
   const enums: FileDigest["enums"] = [];
   const methods: FileDigest["methods"] = [];
   if (file.endsWith(".java")) {
-    for (const m of text.matchAll(/(?:public|private|protected)?\s*static\s+(?:final\s+)?(?:double|int|float|long)\s+(\w+)\s*=\s*([^;]+);/g)) {
-      const expr = m[2].trim();
-      const v = expr === "Double.NaN" ? null : Number(expr.replace(/[dDfFlL]$/, ""));
-      constants.push({ name: `${cls}.${m[1]}`, value: v === null || Number.isFinite(v) ? v : null, expr, file, line: lineAt(text, m.index ?? 0) });
+    // one constant per declarator ("double A = 1, B = 2;" is two); a boolean reads as 1 / 0
+    for (const m of text.matchAll(/(?:public|private|protected)?\s*static\s+(?:final\s+)?(double|int|float|long|boolean)\s+(\w+\s*=\s*[^;]+);/g)) {
+      const line = lineAt(text, m.index ?? 0);
+      for (const decl of m[2].split(/,(?=\s*\w+\s*=)/)) {
+        const d = /^\s*(\w+)\s*=\s*([\s\S]+?)\s*$/.exec(decl);
+        if (!d) continue;
+        const expr = d[2];
+        const v = m[1] === "boolean" ? (expr === "true" ? 1 : expr === "false" ? 0 : null)
+          : expr === "Double.NaN" ? null : Number(expr.replace(/[dDfFlL]$/, ""));
+        constants.push({ name: `${cls}.${d[1]}`, value: v === null || Number.isFinite(v) ? v : null, expr, file, line });
+      }
     }
     for (const m of text.matchAll(/enum\s+(\w+)\s*\{([^}]*)\}/g)) {
       enums.push({ name: `${cls}.${m[1]}`, values: m[2].split(",").map((s) => s.trim()).filter(Boolean), line: lineAt(text, m.index ?? 0) });

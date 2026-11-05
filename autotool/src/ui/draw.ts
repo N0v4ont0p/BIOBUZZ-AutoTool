@@ -129,3 +129,14 @@ export function evidenceLine(f: AutoFeatures, legId: string): string {
   if (j.dwellInCode?.carryIntakeS) parts.push(`carry ${j.dwellInCode.carryIntakeS} s`);
   return parts.join(" · ");
 }
+
+// A turret's reach: the sector from fromDeg counter-clockwise to toDeg (field degrees) around a pivot, radius r.
+export function wedge(cx: number, cy: number, fromDeg: number, toDeg: number, r: number, red: boolean): string {
+  const c = sx(cx, cy, red);
+  const span = Math.max(0, Math.min(359.9, toDeg - fromDeg));
+  const a0 = svgAngle(fromDeg, red) * DEG;
+  const a1 = svgAngle(fromDeg + span, red) * DEG;
+  const p0 = { x: c.x + r * Math.cos(a0), y: c.y + r * Math.sin(a0) };
+  const p1 = { x: c.x + r * Math.cos(a1), y: c.y + r * Math.sin(a1) };
+  return `M ${c.x.toFixed(2)} ${c.y.toFixed(2)} L ${p0.x.toFixed(2)} ${p0.y.toFixed(2)} A ${r} ${r} 0 ${span > 180 ? 1 : 0} 0 ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} Z`;
+}

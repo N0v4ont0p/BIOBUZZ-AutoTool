@@ -306,8 +306,10 @@ export function parseAutoPaths(src: string, symbols: Map<string, number | null>,
         let a = arg;
         const chain: { name: string; value: number | string }[] = [];
         while (a.k === "call" && LEG_OPTIONS.includes(a.name)) {
-          const v = a.args.length === 1 ? evalNumber(a.args[0], new Map()) : undefined;
-          if (typeof v !== "number") throw new JavaSyntaxError(`.${a.name}(...) needs a number`, line);
+          // .keepHeading() / .bothTurrets() take nothing; every other option one number
+          const flag = LEG_FLAGS.includes(a.name);
+          const v = flag ? (a.args.length === 0 ? 1 : undefined) : a.args.length === 1 ? evalNumber(a.args[0], new Map()) : undefined;
+          if (typeof v !== "number") throw new JavaSyntaxError(flag ? `.${a.name}() takes no value` : `.${a.name}(...) needs a number`, line);
           chain.unshift({ name: a.name, value: v });
           a = a.callee;
         }
@@ -376,6 +378,8 @@ export function parseAutoPaths(src: string, symbols: Map<string, number | null>,
           ...(opt("shotTimeout") !== undefined ? { shotTimeoutS: opt("shotTimeout") as number } : {}),
           ...(opt("waitFor") !== undefined ? { waitS: opt("waitFor") as number } : {}),
           ...(opt("carryRamp") !== undefined ? { carryRampS: opt("carryRamp") as number } : {}),
+          ...(opt("keepHeading") !== undefined && end === "SHOOT" ? { keepHeading: true } : {}),
+          ...(opt("bothTurrets") !== undefined && end === "SHOOT" ? { bothTurrets: true } : {}),
           junction: { source: "imported", evidence: [`code=${during}/${end}`] },
         };
         // keep the code's own order only when it differs from AutoTool's
@@ -572,13 +576,17 @@ export function renderLegEntry(leg: Leg, j?: Pick<JavaShape, "legNew" | "enumPre
     ...(leg.shotTimeoutS !== undefined ? { shotTimeout: `.shotTimeout(${fmtNum(leg.shotTimeoutS, 2)})` } : {}),
     ...(leg.waitS !== undefined ? { waitFor: `.waitFor(${fmtNum(leg.waitS, 2)})` } : {}),
     ...(leg.carryRampS !== undefined && leg.during === "RAMP" ? { carryRamp: `.carryRamp(${fmtNum(leg.carryRampS, 2)})` } : {}),
+    ...(leg.keepHeading && leg.end === "SHOOT" ? { keepHeading: ".keepHeading()" } : {}),
+    ...(leg.bothTurrets && leg.end === "SHOOT" ? { bothTurrets: ".bothTurrets()" } : {}),
   };
   const order = leg.optOrder?.length ? [...leg.optOrder, ...LEG_OPTIONS] : LEG_OPTIONS;
   return s + [...new Set(order)].map((k) => parts[k] ?? "").join("");
 }
 
 // AutoRunner.Leg's builder options, in the order AutoTool writes them
-export const LEG_OPTIONS = ["timeout", "carryIntake", "carryRamp", "shotTimeout", "waitFor"];
+export const LEG_OPTIONS = ["timeout", "carryIntake", "carryRamp", "shotTimeout", "waitFor", "keepHeading", "bothTurrets"];
+// the options that take no value (SHOOT legs, team 2026-11-05)
+export const LEG_FLAGS = ["keepHeading", "bothTurrets"];
 
 function renderLegs(spec: AutoSpec): string {
   const entries = spec.legs.map((l) => {

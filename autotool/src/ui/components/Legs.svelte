@@ -11,7 +11,7 @@
   import { decideStop, legKey, stopKey } from "../../shared/stops.ts";
   import { api } from "../api.ts";
   import { CENTER, FIELD, evidenceLine } from "../draw.ts";
-  import { addControl, appendStop, insertStopBefore, moveStop, placePose, removeControl, renamePose, setOption, setStop, straighten } from "../edit.ts";
+  import { addControl, appendStop, fixShotHeadings, insertStopBefore, moveStop, placePose, removeControl, renamePose, setOption, setShotFlag, setStop, straighten } from "../edit.ts";
   import { app } from "../state.svelte.ts";
 
   let { spec, features, model, proposed = null }: { spec: AutoSpec; features: AutoFeatures; model: RobotModel; proposed?: AutoSpec | null } = $props();
@@ -40,6 +40,14 @@
 
   function edit(fn: (s: AutoSpec) => AutoSpec) {
     app.change(fn(app.snapshot()));
+  }
+  // AutoRunner turns a SHOOT leg at INIT so the back turret reaches; this draws those headings into the route
+  let fixNote = $state("");
+  const turning = $derived(features.junctions.filter((j) => j.end === "SHOOT" && j.target.headingFixDeg !== 0));
+  function fixHeadings() {
+    const r = fixShotHeadings(app.snapshot(), features);
+    if (r.fixed.length) app.change(r.spec);
+    fixNote = [r.fixed.length ? `turned ${r.fixed.join(", ")}` : "", ...r.left].filter(Boolean).join("; ");
   }
   function num(v: string): number | null {
     const n = Number(v);
@@ -262,6 +270,13 @@
     <input type="checkbox" checked={!!spec.intakeAlways} onchange={(e) => setIntakeAlways(e.currentTarget.checked)} /> Persistent intake <span class="muted">(intake on all auto, off only during shots)</span>
   </label>
 
+  {#if turning.length || fixNote}
+    <div class="always">
+      {#if turning.length}<button class="fixramp" onclick={fixHeadings} title="Draw each shot at the heading the robot turns it to at INIT, so the back turret reaches the CELL with 10° to spare">Fix shot headings ({turning.length})</button>{/if}
+      {#if fixNote}<span class="muted"> {fixNote}</span>{/if}
+    </div>
+  {/if}
+
   {#each spec.legs as leg, i (leg.id)}
     {@const j = features.junctions.find((x) => x.id === leg.id)}
     {@const lf = features.legs[i]}
@@ -320,6 +335,13 @@
             <div class="f"><span class="k">Wait</span><span><input type="number" step="0.1" min="0.1" max="30" value={leg.waitS ?? ""} onchange={(e) => edit((s) => setOption(s, leg.id, "waitS", num(e.currentTarget.value)))} aria-label="wait (s)" /> s</span></div>
           {/if}
           {#if leg.end === "SHOOT"}
+            {#if j}
+              <div class="f"><span class="k">Turrets</span><span>
+                back {j.target.backMarginDeg.toFixed(0)}° inside its travel, front {j.target.frontMarginDeg.toFixed(0)}°{#if j.target.headingFixDeg !== 0}<span class="rampbad"> · the robot turns {j.target.headingFixDeg.toFixed(1)}° at INIT so the back reaches</span>{/if}
+                <label class="muted"><input type="checkbox" checked={!!leg.bothTurrets} onchange={(e) => edit((s) => setShotFlag(s, leg.id, "bothTurrets", e.currentTarget.checked))} /> both turrets (bigger turn)</label>
+                <label class="muted"><input type="checkbox" checked={!!leg.keepHeading} onchange={(e) => edit((s) => setShotFlag(s, leg.id, "keepHeading", e.currentTarget.checked))} /> keep the drawn heading</label>
+              </span></div>
+            {/if}
             <div class="f"><span class="k">Shot timeout</span><span><input type="number" step="0.5" min="0.5" max="30" placeholder="4" value={leg.shotTimeoutS ?? ""} onchange={(e) => edit((s) => setOption(s, leg.id, "shotTimeoutS", num(e.currentTarget.value)))} aria-label="shot timeout (s)" /> s <span class="muted">skip the shot if not ready by then</span></span></div>
           {/if}
           {#if leg.during !== "NONE"}

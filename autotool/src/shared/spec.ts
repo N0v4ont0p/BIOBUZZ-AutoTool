@@ -89,6 +89,8 @@ export interface Leg {
   shotTimeoutS?: number; // Leg.shotTimeout(s), SHOOT; absent = AutoRunner's SHOT_TIMEOUT_S
   waitS?: number; // Leg.waitFor(s), WAIT: how long it holds at the end
   carryRampS?: number; // Leg.carryRamp(s), RAMP: the ramp stays out this long into the next leg; absent = AutoRunner's RAMP_CARRY_S
+  keepHeading?: boolean; // Leg.keepHeading(), SHOOT: no INIT turn for the turret
+  bothTurrets?: boolean; // Leg.bothTurrets(), SHOOT: turn so both turrets reach, not only the back
   junction: Junction; // why (the AI's evidence for this stop)
   comment?: string;
   optOrder?: string[]; // the order the code wrote the options in (kept on round trip)
@@ -153,7 +155,11 @@ export function withStop(leg: Leg, during: During, end: End, source: LegSource, 
   const out: Leg = { ...leg, during, end, junction: { source, evidence, ...(extra.note ? { note: extra.note } : {}), ...(extra.review ? { review: true } : {}) } };
   if (during === "NONE") out.carryIntakeS = 0;
   if (during !== "RAMP") delete out.carryRampS;
-  if (end !== "SHOOT") delete out.shotTimeoutS;
+  if (end !== "SHOOT") {
+    delete out.shotTimeoutS;
+    delete out.keepHeading;
+    delete out.bothTurrets;
+  }
   if (end !== "WAIT") delete out.waitS;
   else out.waitS = extra.waitS ?? leg.waitS ?? 1;
   return out;

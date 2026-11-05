@@ -31,6 +31,7 @@ import {
   wrapDeg,
 } from "./geometry.ts";
 import type { RobotModel } from "./profile.ts";
+import { REACH_MARGIN_DEG, bestShotHeading } from "./shotHeading.ts";
 import { CENTER as MID, FIELD, type SeasonPack, type StagedElement } from "./season.ts";
 import { type AutoSpec, type During, type End, type Problem, startPoseName } from "./spec.ts";
 
@@ -237,6 +238,11 @@ export interface JunctionFeatures {
     reachable: boolean; // at least one turret reaches: AutoAim has a solution and that launcher fires
     fires: "both" | "front" | "back" | "none"; // the launchers whose gate opens on a shot here
     turretMarginDeg: number; // the better turret's margin to its nearest limit, negative = neither reaches
+    frontMarginDeg: number; // each turret's margin to its nearest limit (negative = cannot reach)
+    backMarginDeg: number;
+    // SHOOT: the turn AutoRunner makes at INIT so the back turret (both with .bothTurrets()) reaches with
+    // REACH_MARGIN_DEG (ShotHeading); the aim and footprint here are from the turned pose; 0 = as drawn
+    headingFixDeg: number;
   };
   zone: { in: boolean; edgeIn: number; reasons: string[] };
   // atLegStart = held when the leg into this junction began; before = on arrival; after = after the end action
@@ -452,10 +458,11 @@ export function solveAim(pose: { x: number; y: number; headingDeg: number }, mod
   const t = targetCell(model, pose.y);
   const fp = toField(pose, model.frontPivot.x, model.frontPivot.y);
   const bp = toField(pose, model.backPivot.x, model.backPivot.y);
-  const yawTo = (p: Vec) => wrapDeg(Math.atan2(t.y - p.y, t.x - p.x) / DEG - pose.headingDeg);
+  // each turret's own angle (Yaw.toTurretDeg): from its centre direction (180 = straight back, team 2026-11-04)
+  const yawTo = (p: Vec, center: number) => wrapDeg(Math.atan2(t.y - p.y, t.x - p.x) / DEG - pose.headingDeg - (Number.isFinite(center) ? center : 0));
   const margin = (deg: number, l: { minDeg: number; maxDeg: number }) => Math.min(deg - l.minDeg, l.maxDeg - deg);
-  const frontYaw = yawTo(fp);
-  const backYaw = yawTo(bp);
+  const frontYaw = yawTo(fp, model.yaw.front.centerDeg);
+  const backYaw = yawTo(bp, model.yaw.back.centerDeg);
   const fm = margin(frontYaw, model.yaw.front);
   const bm = margin(backYaw, model.yaw.back);
   const fr = fm >= 0;
@@ -474,6 +481,9 @@ export function solveAim(pose: { x: number; y: number; headingDeg: number }, mod
     reachable: fr || br,
     fires: fr && br ? "both" : fr ? "front" : br ? "back" : "none",
     turretMarginDeg: Math.max(fm, bm),
+    frontMarginDeg: fm,
+    backMarginDeg: bm,
+    headingFixDeg: 0,
   };
 }
 
@@ -781,8 +791,21 @@ export function computeFeatures(spec: AutoSpec, pack: SeasonPack, model: RobotMo
     if (g.drawable && ep) {
       const endSample = g.samples[g.samples.length - 1];
       const hEnd = endSample?.headingDeg ?? ep.h;
-      const pose = { x: ep.x, y: ep.y, headingDeg: hEnd };
-      const aim = solveAim(pose, model);
+      const drawnPose = { x: ep.x, y: ep.y, headingDeg: hEnd };
+      // AutoRunner.fixHeadings: a SHOOT leg ends turned the least that lets the back turret reach (unless keepHeading).
+      // A stop that is not decided yet (NONE) is judged the same way: if it became a SHOOT the robot would turn there.
+      const fix = (leg.end === "SHOOT" || leg.end === "NONE") && !leg.keepHeading ? bestShotHeading(drawnPose, model, leg.bothTurrets ? "both" : "back") : null;
+      const aimPose = fix?.ok ? { ...drawnPose, headingDeg: fix.headingDeg } : drawnPose;
+      // the robot is really at the turned heading only on a SHOOT
+      const pose = leg.end === "SHOOT" ? aimPose : drawnPose;
+      const aim = { ...solveAim(aimPose, model), headingFixDeg: fix?.ok ? fix.changeDeg : 0 };
+      if (leg.end !== "SHOOT") {
+        // (undecided: the turn is only reported once it is a SHOOT)
+      } else if (fix?.ok && fix.changeDeg !== 0) {
+        problems.push({ level: "warning", code: "shot.heading", where: `leg:${leg.id}`, message: `the back turret cannot reach the CELL with ${REACH_MARGIN_DEG} deg to spare from ${leg.id}'s drawn heading: the robot turns ${round(fix.changeDeg, 1)} deg on the way (Fix shot headings draws it)` });
+      } else if (fix && !fix.ok) {
+        problems.push({ level: "warning", code: "shot.heading", where: `leg:${leg.id}`, message: `no heading at ${leg.id} lets the ${leg.bothTurrets ? "turrets" : "back turret"} reach the CELL with ${REACH_MARGIN_DEG} deg to spare` });
+      }
       const fp = footprint(pose, model.body);
       const clear = wallClearance(fp);
       // the launchers that send something here: the front fires NECTAR, the back POLLEN, each only in its turret's reach

@@ -69,6 +69,8 @@ export const FACT_DEFAULTS: Omit<Fact, "status" | "source" | "confirmed">[] = [
   { key: "frontYawMaxDeg", label: "Front turret travel, left limit", value: 90, unit: "deg", group: "shooter" },
   { key: "backYawMinDeg", label: "Back turret travel, right limit", value: -90, unit: "deg", group: "shooter" },
   { key: "backYawMaxDeg", label: "Back turret travel, left limit", value: 90, unit: "deg", group: "shooter" },
+  { key: "frontYawCenterDeg", label: "Front turret centre direction", value: 180, unit: "deg", group: "shooter", note: "robot-relative direction the turret points at its centre (servo 0.5); 180 = straight back (team 2026-11-04)" },
+  { key: "backYawCenterDeg", label: "Back turret centre direction", value: 180, unit: "deg", group: "shooter", note: "robot-relative direction the turret points at its centre (servo 0.5); 180 = straight back (team 2026-11-04)" },
   { key: "yawDegPerS", label: "Turret turn speed (the slower turret)", value: "not set", unit: "deg/s", group: "shooter", note: "each turret has its own servo and aims on its own; until program 3 times it the shot time has no turret wait" },
   { key: "frontLaunchDeg", label: "Front launch angle (fixed, no hood)", value: "not set", unit: "deg", group: "shooter" },
   { key: "backLaunchDeg", label: "Back launch angle (fixed, no hood)", value: "not set", unit: "deg", group: "shooter" },
@@ -94,6 +96,10 @@ export const FACT_DEFAULTS: Omit<Fact, "status" | "source" | "confirmed">[] = [
   { key: "cellRedFarY", label: "Red far CELL y", value: 89.17, unit: "in", group: "field" },
   { key: "cellRedAudienceX", label: "Red audience CELL x", value: 57.84, unit: "in", group: "field" },
   { key: "cellRedAudienceY", label: "Red audience CELL y", value: 52.0, unit: "in", group: "field" },
+  { key: "teammateGoals", label: "Robot aims at the teammate's goals", value: 1, unit: "", group: "field", note: "Field.TEAMMATE_GOALS: 1 = his rounder numbers below (the robot's default), 0 = the CELLs above" },
+  { key: "teammateRedX", label: "Teammate red goal x", value: 60, unit: "in", group: "field" },
+  { key: "teammateRedFarY", label: "Teammate red far goal y", value: 91, unit: "in", group: "field" },
+  { key: "teammateRedAudienceY", label: "Teammate red audience goal y", value: 51, unit: "in", group: "field" },
   { key: "cellHeightIn", label: "CELL opening centre height", value: 46, unit: "in", group: "field", note: "the launch angle reach check aims at it" },
   { key: "parkRegion", label: "Parking region", value: "LOADING ZONE", unit: "", group: "field" },
   { key: "humanFeedAfterTip", label: "NECTAR a human adds after a HIVE TIP in auto", value: 0, unit: "NECTAR", group: "field", note: "the AI never counts on it" },
@@ -149,7 +155,7 @@ export interface RobotModel {
   body: { front: number; back: number; left: number; right: number };
   frontPivot: { x: number; y: number };
   backPivot: { x: number; y: number };
-  yaw: { front: { minDeg: number; maxDeg: number }; back: { minDeg: number; maxDeg: number } };
+  yaw: { front: { minDeg: number; maxDeg: number; centerDeg: number }; back: { minDeg: number; maxDeg: number; centerDeg: number } };
   yawDegPerS: number; // NaN = not timed yet
   launch: { front: { deg: number; releaseIn: number }; back: { deg: number; releaseIn: number } }; // NaN = not in the CAD yet
   cellHeightIn: number;
@@ -206,7 +212,10 @@ export function robotModel(facts: Record<string, Fact>): RobotModel {
     body: { front: n("centerToFront"), back: n("centerToBack"), left: n("centerToLeft"), right: n("centerToRight") },
     frontPivot: { x: n("frontPivotX"), y: n("frontPivotY") },
     backPivot: { x: n("backPivotX"), y: n("backPivotY") },
-    yaw: { front: { minDeg: n("frontYawMinDeg"), maxDeg: n("frontYawMaxDeg") }, back: { minDeg: n("backYawMinDeg"), maxDeg: n("backYawMaxDeg") } },
+    yaw: {
+      front: { minDeg: n("frontYawMinDeg"), maxDeg: n("frontYawMaxDeg"), centerDeg: n("frontYawCenterDeg") },
+      back: { minDeg: n("backYawMinDeg"), maxDeg: n("backYawMaxDeg"), centerDeg: n("backYawCenterDeg") },
+    },
     yawDegPerS: opt("yawDegPerS"),
     launch: { front: { deg: opt("frontLaunchDeg"), releaseIn: opt("frontReleaseHeightIn") }, back: { deg: opt("backLaunchDeg"), releaseIn: opt("backReleaseHeightIn") } },
     cellHeightIn: opt("cellHeightIn"),
@@ -224,7 +233,10 @@ export function robotModel(facts: Record<string, Fact>): RobotModel {
     decel: n("decel"),
     latAccel: n("latAccel"),
     maxTurnDegS: n("maxTurnDegS"),
-    cells: { RED: { far: { x: n("cellRedFarX"), y: n("cellRedFarY") }, audience: { x: n("cellRedAudienceX"), y: n("cellRedAudienceY") } } },
+    // where the robot really aims (Field.targetCell): the teammate's goals by default, else the CELLs
+    cells: n("teammateGoals") === 1
+      ? { RED: { far: { x: n("teammateRedX"), y: n("teammateRedFarY") }, audience: { x: n("teammateRedX"), y: n("teammateRedAudienceY") } } }
+      : { RED: { far: { x: n("cellRedFarX"), y: n("cellRedFarY") }, audience: { x: n("cellRedAudienceX"), y: n("cellRedAudienceY") } } },
     wallMarginIn: n("wallMarginIn"),
     tinyMoveIn: n("tinyMoveIn"),
     intakeLeadMaxDeg: n("intakeLeadMaxDeg"),

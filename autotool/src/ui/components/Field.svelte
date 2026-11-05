@@ -7,7 +7,7 @@
   import type { SeasonPack } from "../../shared/season.ts";
   import type { AutoSpec } from "../../shared/spec.ts";
   import fieldImage from "../../../../public/fields/biobuzz.webp";
-  import { CENTER, FIELD, annulus, carryStretch, chevrons, fromSvg, legLook, midpoint, pointsAttr, rectAttrs, svgAngle, sx, turnArc } from "../draw.ts";
+  import { CENTER, FIELD, annulus, carryStretch, chevrons, fromSvg, legLook, midpoint, pointsAttr, rectAttrs, svgAngle, sx, turnArc, wedge } from "../draw.ts";
   import { addLegAt, movePose, setHeading, splitLeg } from "../edit.ts";
   import { app } from "../state.svelte.ts";
 
@@ -306,11 +306,19 @@
         <circle cx={p.x} cy={p.y} r="2.4" class="unsurestop" /><text x={p.x} y={p.y + 0.1} class="unsuretext" text-anchor="middle" dominant-baseline="central">?</text>
       {:else if leg.end === "SHOOT"}
         {@const cp = sx(j.target.x, j.target.y, red)}
-        <!-- each turret aims on its own: a dashed amber line is a turret that cannot reach (its gate stays shut) -->
-        {#each [[model.frontPivot, j.target.frontReachable, "front"], [model.backPivot, j.target.backReachable, "back"]] as const as [pivot, ok, side]}
-          {@const pv = bodyToField({ x: j.pose.x, y: j.pose.y, headingDeg: j.pose.headingDeg }, pivot.x, pivot.y)}
+        <!-- the heading the robot shoots from: AutoRunner turns a SHOOT leg at INIT so the back turret reaches -->
+        {@const sh = j.pose.headingDeg + j.target.headingFixDeg}
+        {#if j.target.headingFixDeg !== 0}
+          <polyline points={arrowPts(j.pose.x, j.pose.y, sh, model.body.front)} class="fixheading"><title>the robot turns {j.target.headingFixDeg.toFixed(1)}° here so the back turret reaches (Fix shot headings draws it)</title></polyline>
+        {/if}
+        <!-- each turret's travel (shaded), and its line to the CELL: solid = reaches with 10° to spare, amber = less, dashed red = cannot -->
+        {#each [[model.frontPivot, j.target.frontReachable, j.target.frontMarginDeg, "front"], [model.backPivot, j.target.backReachable, j.target.backMarginDeg, "back"]] as const as [pivot, ok, margin, side]}
+          {@const pv = bodyToField({ x: j.pose.x, y: j.pose.y, headingDeg: sh }, pivot.x, pivot.y)}
           {@const pp = sx(pv.x, pv.y, red)}
-          <line x1={pp.x} y1={pp.y} x2={cp.x} y2={cp.y} class="aim" class:bad={!ok}><title>{side} turret {Math.round(side === "front" ? j.target.frontYawDeg : j.target.backYawDeg)}°{ok ? "" : ": cannot reach, does not fire"}</title></line>
+          {@const lim = model.yaw[side]}
+          {@const c0 = sh + (Number.isFinite(lim.centerDeg) ? lim.centerDeg : 0)}
+          <path d={wedge(pv.x, pv.y, c0 + lim.minDeg, c0 + lim.maxDeg, 10, red)} class="reach {side}" />
+          <line x1={pp.x} y1={pp.y} x2={cp.x} y2={cp.y} class="aim" class:bad={!ok} class:thin={ok && margin < 10}><title>{side} turret {Math.round(side === "front" ? j.target.frontYawDeg : j.target.backYawDeg)}° ({margin.toFixed(0)}° inside its travel){ok ? "" : ": cannot reach, does not fire"}</title></line>
         {/each}
         <circle cx={p.x} cy={p.y} r="5.2" class="zonering" class:out={!j.zone.in} />
         <circle cx={p.x} cy={p.y} r="3" class="target" /><circle cx={p.x} cy={p.y} r="1.6" class="target" /><circle cx={p.x} cy={p.y} r="0.5" class="targetdot" />
@@ -542,7 +550,25 @@
     stroke-dasharray: 1 0.6;
   }
   .aim.bad {
+    stroke: #d32f2f;
+  }
+  .aim.thin {
     stroke: var(--unsure);
+  }
+  .reach {
+    fill: var(--shoot);
+    fill-opacity: 0.08;
+    stroke: none;
+    pointer-events: none;
+  }
+  .reach.front {
+    fill-opacity: 0.05;
+  }
+  .fixheading {
+    fill: none;
+    stroke: var(--shoot);
+    stroke-width: 0.5;
+    stroke-dasharray: 0.8 0.5;
   }
   .zonering {
     fill: none;

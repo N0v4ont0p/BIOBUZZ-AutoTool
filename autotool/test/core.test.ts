@@ -51,14 +51,14 @@ test("geometry: bezier ends, line length, angle wrap", () => {
   assert.equal(wrapDeg(-180), 180);
 });
 
-test("aim: robot facing the CELL needs ~0 deg of either turret; facing away is out of travel", () => {
-  const facing = solveAim({ x: 116.585, y: 88.585, headingDeg: 178.99 }, model);
-  assert.ok(Math.abs(facing.frontYawDeg) < 1 && Math.abs(facing.backYawDeg) < 1, `front ${facing.frontYawDeg} back ${facing.backYawDeg}`);
-  assert.equal(facing.cell, "far");
-  assert.equal(facing.fires, "both");
-  const away = solveAim({ x: 116.585, y: 88.585, headingDeg: -1.01 }, model);
-  assert.equal(away.reachable, false);
-  assert.equal(away.fires, "none");
+test("aim: the turrets face back (centre 180), so the robot's back to the CELL needs ~0 deg; facing it is out of travel", () => {
+  const backTo = solveAim({ x: 116.585, y: 88.585, headingDeg: -2.56 }, model); // the robot aims at the teammate goal (81.17, 90.17) by default
+  assert.ok(Math.abs(backTo.frontYawDeg) < 1 && Math.abs(backTo.backYawDeg) < 1, `front ${backTo.frontYawDeg} back ${backTo.backYawDeg}`);
+  assert.equal(backTo.cell, "far");
+  assert.equal(backTo.fires, "both");
+  const facing = solveAim({ x: 116.585, y: 88.585, headingDeg: 177.44 }, model);
+  assert.equal(facing.reachable, false);
+  assert.equal(facing.fires, "none");
 });
 
 test("features: sample auto has the expected stops, inventory and time", () => {
@@ -769,11 +769,13 @@ test("reach: a fixed launch angle scores only from far enough out; a SHOOT close
 });
 
 test("turrets: each aims on its own; a stop only one reaches fires that launcher only, and the shot waits for the turret", () => {
-  // heading 232 at shot1: each turret needs about -44 deg
+  // heading 52 at shot1: each turret (centre 180, straight back) needs about -44 deg. keepHeading: the robot shoots
+  // from the drawn heading, no INIT turn, so one turret stays out of reach
   const turned = (preload = { POLLEN: 4, NECTAR: 0, onTiles: 0 }) => {
     const s = sampleSpec();
     s.preload = preload;
-    s.poses.find((p) => p.name === "shot1")!.headingDeg = 232;
+    s.poses.find((p) => p.name === "shot1")!.headingDeg = 52;
+    s.legs[0] = { ...s.legs[0], keepHeading: true };
     return s;
   };
   const narrowBack = robotWith({ backYawMinDeg: -20, backYawMaxDeg: 20 });

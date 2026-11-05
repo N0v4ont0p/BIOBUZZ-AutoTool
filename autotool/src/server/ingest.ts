@@ -58,6 +58,12 @@ export function factsFromDigest(d: Digest, pack: SeasonPack): Record<string, Fac
   // one yaw servo per turret, each with its own soft limits (program 3)
   for (const k of ["frontYawMinDeg", "frontYawMaxDeg", "backYawMinDeg", "backYawMaxDeg"]) set(k, fromConstant(d, `Tuned.${k}`, "program 3"));
   set("yawDegPerS", fromConstant(d, "Tuned.yawDegPerS", "program 3, the slower turret"));
+  // where each turret points at its centre (Yaw.toTurretDeg: 180 = straight back), and which goals the robot aims at
+  for (const k of ["frontYawCenterDeg", "backYawCenterDeg"]) set(k, fromConstant(d, `Tuned.${k}`, "team-config, the turret build"));
+  set("teammateGoals", fromConstant(d, "Field.TEAMMATE_GOALS", ""));
+  set("teammateRedX", fromConstant(d, "Field.TEAMMATE_RED_X", ""));
+  set("teammateRedFarY", fromConstant(d, "Field.TEAMMATE_RED_FAR_Y", ""));
+  set("teammateRedAudienceY", fromConstant(d, "Field.TEAMMATE_RED_AUDIENCE_Y", ""));
   set("gateTravelS", fromConstant(d, "Tuned.gateTravelS", "E-8, the slowest gate servo"));
   set("rampOutS", fromConstant(d, "Tuned.rampOutS", "program 4, slow motion"));
   set("rampInS", fromConstant(d, "Tuned.rampInS", "program 4, slow motion"));
